@@ -1,0 +1,7 @@
+{
+  "id": "frame-rate",
+  "name": "帧率设置",
+  "apiVersion": 1,
+  "assembly": "Gkms.FrameRate.dll",
+  "entryPoint": "Gkms.Plugins.FrameRate.Plugin"
+}

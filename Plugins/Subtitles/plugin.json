@@ -1,0 +1,7 @@
+{
+  "id": "subtitles",
+  "name": "主页语音字幕",
+  "apiVersion": 1,
+  "assembly": "Gkms.Subtitles.dll",
+  "entryPoint": "Gkms.Plugins.Subtitles.Plugin"
+}

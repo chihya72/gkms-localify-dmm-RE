@@ -1,0 +1,7 @@
+{
+  "id": "gyro",
+  "name": "鼠标与键盘全景摄影",
+  "apiVersion": 1,
+  "assembly": "Gkms.Gyro.dll",
+  "entryPoint": "Gkms.Plugins.Gyro.Plugin"
+}

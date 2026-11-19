@@ -1,0 +1,7 @@
+{
+  "id": "capture",
+  "name": "原文采集",
+  "apiVersion": 1,
+  "assembly": "Gkms.Capture.dll",
+  "entryPoint": "Gkms.Plugins.Capture.Plugin"
+}

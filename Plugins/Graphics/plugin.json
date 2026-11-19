@@ -1,0 +1,7 @@
+{
+  "id": "graphics",
+  "name": "画质与渲染比例",
+  "apiVersion": 1,
+  "assembly": "Gkms.Graphics.dll",
+  "entryPoint": "Gkms.Plugins.Graphics.Plugin"
+}

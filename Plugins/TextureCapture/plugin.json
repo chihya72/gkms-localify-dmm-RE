@@ -1,0 +1,7 @@
+{
+  "id": "texture-capture",
+  "name": "界面贴图导出",
+  "apiVersion": 1,
+  "assembly": "Gkms.TextureCapture.dll",
+  "entryPoint": "Gkms.Plugins.TextureCapture.Plugin"
+}

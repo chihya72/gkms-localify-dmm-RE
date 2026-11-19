@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <DisableWinExeOutputInference>true</DisableWinExeOutputInference>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\Host\Gkms.Host.csproj" /></ItemGroup>
+  <Target Name="StageManager" AfterTargets="Build">
+    <ItemGroup><ManagerFile Include="$(TargetDir)Gkms.Manager.*;$(TargetDir)Gkms.Sdk.dll;$(TargetDir)Gkms.Host.dll" Exclude="$(TargetDir)*.pdb" /></ItemGroup>
+    <Copy SourceFiles="@(ManagerFile)" DestinationFolder="$(MSBuildThisFileDirectory)..\out\$(Configuration)\gakumas-local\re" />
+  </Target>
+</Project>

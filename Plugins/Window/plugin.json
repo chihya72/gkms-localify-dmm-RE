@@ -1,0 +1,7 @@
+{
+  "id": "window",
+  "name": "窗口尺寸与方向",
+  "apiVersion": 1,
+  "assembly": "Gkms.Window.dll",
+  "entryPoint": "Gkms.Plugins.Window.Plugin"
+}
