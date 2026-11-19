@@ -13,6 +13,7 @@ namespace UnityEngine
         public string name { get; set; } = "";
         public bool Destroyed { get; private set; }
         public static implicit operator bool(Object? obj) => obj != null && !obj.Destroyed;
+        public int GetInstanceID() => RuntimeHelpers.GetHashCode(this);
         public static void Destroy(Object value) => value.Destroyed = true;
     }
     public class Font : Object { }
@@ -24,9 +25,29 @@ namespace UnityEngine
         public void Unload(bool destroy) { }
     }
     public class Texture : Object { public int filterMode { get; set; } public int wrapMode { get; set; } }
-    public class Texture2D : Texture { public Texture2D(int width, int height) { } }
+    public class Texture2D : Texture
+    {
+        public int width { get; }
+        public int height { get; }
+        public Texture2D(int width, int height) => (this.width, this.height) = (width, height);
+        public void ReadPixels(Rect rectangle, int x, int y, bool mipmaps) { }
+        public void Apply(bool mipmaps, bool unreadable) { }
+    }
+    public class RenderTexture : Texture
+    {
+        public static RenderTexture? active { get; set; }
+        public static RenderTexture GetTemporary(int width, int height) => new();
+        public static void ReleaseTemporary(RenderTexture texture) { }
+    }
+    public static class Graphics { public static void Blit(Texture texture, RenderTexture target) { } }
+    public static class DebugLogHandler
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void Internal_Log(int level, int options, string message, Object? context) { }
+    }
     public static class ImageConversion
     {
+        public static byte[] EncodeToPNG(Texture2D texture) => new byte[] { 137, 80, 78, 71 };
         public static bool LoadImage(Texture2D texture, byte[] bytes, bool mark) => bytes.Length > 0;
         public static bool LoadImage(Texture2D texture, ReadOnlySpan<byte> bytes, bool mark) => throw new Exception("错误的 PNG 重载");
     }

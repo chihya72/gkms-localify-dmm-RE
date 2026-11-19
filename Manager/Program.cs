@@ -26,10 +26,17 @@ internal static class Program
             Console.WriteLine("已从 localizationConfig.json 导入选择和参数。");
             return 0;
         }
+        if (args is ["update", _] or ["update", _, _])
+        {
+            if (!catalog.TryGetValue(args[1], out var package)) throw new InvalidDataException($"找不到插件 {args[1]}");
+            var count = PluginHost.UpdateResourcesAsync(package, Path.Combine(root, ".."), args.ElementAtOrDefault(2)).GetAwaiter().GetResult();
+            Console.WriteLine($"{package.Manifest.Name} 已更新 {count} 个资源文件。");
+            return 0;
+        }
         if (args[0] is not ("list" or "enable" or "disable") ||
             (args[0] == "list" ? args.Length != 1 : args.Length < 2))
         {
-            Console.Error.WriteLine("Gkms.Manager list | enable <id> ... | disable <id> ... | import-legacy");
+            Console.Error.WriteLine("Gkms.Manager list | enable <id> ... | disable <id> ... | update <id> [来源] | import-legacy");
             return 2;
         }
         if (args[0] == "list")

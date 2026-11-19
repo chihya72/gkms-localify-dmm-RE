@@ -3,7 +3,10 @@ using System.Text.RegularExpressions;
 
 namespace Gkms.Host;
 
-public sealed record Manifest(string Id, string Name, int ApiVersion, string Assembly, string EntryPoint);
+public sealed record Manifest(string Id, string Name, int ApiVersion, string Assembly, string EntryPoint)
+{
+    public string? ResourceUpdater { get; init; }
+}
 public sealed record Package(string Directory, Manifest Manifest);
 public sealed record Profile(string[] Enabled, Dictionary<string, JsonElement>? Settings = null)
 {
@@ -24,7 +27,7 @@ public static class Catalog
         var p = JsonSerializer.Deserialize<Profile>(File.ReadAllText(file), Json);
         if (p?.Enabled == null || p.Enabled.Any(id => id == null || !IdPattern.IsMatch(id)))
             throw new InvalidDataException("enabled 必须是插件 ID 数组。");
-        return TextPackageUpgrade.Convert(p, catalog);
+        return PackageUpgrade.Convert(p, catalog);
     }
 
     public static IReadOnlyDictionary<string, Package> Discover(string directory, Action<string> log)
@@ -54,9 +57,8 @@ public static class Catalog
             packages.Remove(id);
             log($"{id}: 插件 ID 重复，已跳过所有同名包。");
         }
-        if (TextPackageUpgrade.IsInstalled(packages))
-            foreach (var old in packages.Values.Where(p => TextPackageUpgrade.IsFormer(p.Manifest)).ToArray())
-                packages.Remove(old.Manifest.Id);
+        foreach (var old in packages.Values.Where(p => PackageUpgrade.IsRetired(p.Manifest, packages)).ToArray())
+            packages.Remove(old.Manifest.Id);
         return packages;
     }
 }

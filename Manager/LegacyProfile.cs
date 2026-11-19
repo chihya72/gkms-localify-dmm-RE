@@ -17,11 +17,11 @@ internal static class LegacyProfile
             ["localization"] = true,
             ["textures"] = Flag("replaceTexture", true), ["frame-rate"] = Number("targetFrameRate") > 0,
             ["schedule-sp"] = Flag("dbgMode"), ["card-cut-in"] = Flag("dbgMode"),
-            ["purchase-guard"] = Flag("loginAsIOS"), ["settings-panel"] = true,
+            ["purchase-guard"] = Flag("loginAsIOS"),
             ["graphics"] = Flag("useCustomeGraphicSettings"), ["window"] = Number("gameOrientation") != 0 || Flag("dmmUnlockSize"),
             ["camera"] = Flag("enableFreeCamera"), ["gyro"] = Flag("enableGyroEmu"), ["physics"] = Flag("enableBreastParam"),
-            ["capture"] = Flag("dumpText"), ["texture-capture"] = Flag("dumpRuntimeTexture"),
-            ["unity-log"] = Flag("dbgMode"), ["auto-photo"] = Flag("dbgMode")
+            ["capture"] = Flag("dumpText") || Flag("dumpRuntimeTexture"),
+            ["auto-photo"] = Flag("dbgMode")
         };
         var settings = new Dictionary<string, JsonObject>();
         settings["localization"] = new JsonObject { ["textTest"] = Flag("textTest") };

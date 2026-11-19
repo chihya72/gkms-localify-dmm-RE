@@ -18,15 +18,20 @@ namespace UnityEngine
     }
     public static class Input
     {
-        public static bool F8;
+        public static bool F8, U;
+        public static int CtrlReads;
         public static float Scroll;
         public static float GetAxisRaw(string name)
         {
             if (name != "Mouse ScrollWheel") return 0;
             var value = Scroll; Scroll = 0; return value;
         }
-        public static bool GetKey(string name) => false;
-        public static bool GetKeyDown(string name) { if (name != "f8") return false; var hit = F8; F8 = false; return hit; }
+        public static bool GetKey(string name)
+        {
+            if (name is "left ctrl" or "right ctrl") CtrlReads++;
+            return false;
+        }
+        public static bool GetKeyDown(string name) { if (name == "u") { var u = U; U = false; return u; } if (name != "f8") return false; var hit = F8; F8 = false; return hit; }
     }
     public static class Time { public static int frameCount { get; set; } public static float unscaledDeltaTime => .016f; }
     public enum HumanBodyBones { Head = 10 }

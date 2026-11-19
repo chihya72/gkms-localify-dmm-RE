@@ -2,7 +2,7 @@
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Host\Gkms.Host.csproj" />
-    <ProjectReference Include="..\Tools\Resources\Gkms.Resources.csproj" />
+    <ProjectReference Include="..\Plugins\Capture\Gkms.Capture.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Plugins\Localization\Gkms.Localization.csproj" />
     <ProjectReference Include="..\Plugins\PurchaseGuard\Gkms.PurchaseGuard.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Plugins\ScheduleSp\Gkms.ScheduleSp.csproj" ReferenceOutputAssembly="false" />

@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
-  <Target Name="StageUpdateTool" AfterTargets="Build">
-    <ItemGroup><ToolFile Include="$(TargetDir)Gkms.Resources.*" Exclude="$(TargetDir)*.pdb" /></ItemGroup>
-    <Copy SourceFiles="@(ToolFile)" DestinationFolder="$(MSBuildThisFileDirectory)..\..\out\$(Configuration)\gakumas-local\re" />
-  </Target>
-</Project>

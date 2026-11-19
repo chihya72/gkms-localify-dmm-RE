@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.Reflection;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.SettingsPanel;
+namespace Gkms.Host;
 
-public sealed class Plugin : ILocalifyPlugin
+internal sealed class SettingsShortcut : ILocalifyPlugin
 {
     private static MethodInfo key = null!, down = null!;
     private static Process? window;
@@ -19,7 +19,7 @@ public sealed class Plugin : ILocalifyPlugin
         key = ctx.Require("UnityEngine.InputLegacyModule", "UnityEngine.Input", "GetKey", "System.String");
         down = ctx.Require("UnityEngine.InputLegacyModule", "UnityEngine.Input", "GetKeyDown", "System.String");
         ctx.Patch(ctx.Require("campus-submodule.Runtime", "Campus.Common.CampusQualityManager", "Update"),
-            postfix: GameMethods.Handler<Plugin>(nameof(Update)));
+            postfix: GameMethods.Handler<SettingsShortcut>(nameof(Update)));
     }
 
     public static void Update()

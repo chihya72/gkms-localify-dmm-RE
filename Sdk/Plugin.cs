@@ -8,6 +8,12 @@ public interface ILocalifyPlugin : IDisposable
     void Start(IPluginContext context);
 }
 
+// Invoked by the manager without starting the game or registering any callbacks.
+public interface IResourceUpdater
+{
+    Task<int> UpdateAsync(string dataDirectory, string? source);
+}
+
 public interface IPluginContext
 {
     string DataDirectory { get; }

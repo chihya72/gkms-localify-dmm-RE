@@ -9,5 +9,11 @@
   <Target Name="StageManager" AfterTargets="Build">
     <ItemGroup><ManagerFile Include="$(TargetDir)Gkms.Manager.*;$(TargetDir)Gkms.Sdk.dll;$(TargetDir)Gkms.Host.dll" Exclude="$(TargetDir)*.pdb" /></ItemGroup>
     <Copy SourceFiles="@(ManagerFile)" DestinationFolder="$(MSBuildThisFileDirectory)..\out\$(Configuration)\gakumas-local\re" />
+    <PropertyGroup><Stage>$(MSBuildThisFileDirectory)..\out\$(Configuration)\gakumas-local\re</Stage></PropertyGroup>
+    <ItemGroup>
+      <FormerPlugin Include="Gkms.TextureCapture;Gkms.SettingsPanel;Gkms.UnityLog" />
+      <FormerTool Include="Gkms.Resources.exe;Gkms.Resources.dll;Gkms.Resources.deps.json;Gkms.Resources.runtimeconfig.json" />
+    </ItemGroup>
+    <Delete Files="@(FormerTool->'$(Stage)\%(Identity)');@(FormerPlugin->'$(Stage)\plugins\%(Identity)\plugin.json');@(FormerPlugin->'$(Stage)\plugins\%(Identity)\%(Identity).dll')" />
   </Target>
 </Project>

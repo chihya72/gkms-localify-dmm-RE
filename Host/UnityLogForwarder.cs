@@ -1,8 +1,8 @@
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.UnityLog;
+namespace Gkms.Host;
 
-public sealed class Plugin : ILocalifyPlugin
+internal sealed class UnityLogForwarder : ILocalifyPlugin
 {
     private static IPluginContext? session;
     [ThreadStatic] private static bool writing;
@@ -11,7 +11,7 @@ public sealed class Plugin : ILocalifyPlugin
         session = context;
         var method = context.RequireType("UnityEngine.CoreModule", "UnityEngine.DebugLogHandler")
             .GetMethods(GameMethods.Declared).Single(m => m.Name == "Internal_Log" && m.GetParameters() is [_, _, { ParameterType: var t }, _] && t == typeof(string));
-        context.Patch(method, GameMethods.Handler<Plugin>(nameof(Observe)));
+        context.Patch(method, GameMethods.Handler<UnityLogForwarder>(nameof(Observe)));
     }
     public static void Observe(string __2)
     {

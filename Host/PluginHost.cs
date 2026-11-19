@@ -16,6 +16,8 @@ public sealed class PluginHost : IDisposable
     private readonly IGameServices game;
     private readonly Action<string> log;
     private readonly List<(ILocalifyPlugin Plugin, Scope Scope, PackageLoader Loader)> running = new();
+    private readonly PluginComponents framework = new();
+    private Scope? frameworkScope;
     public IReadOnlyList<string> Active => running.Select(item => item.Scope.Id).ToArray();
 
     public PluginHost(IGameServices game, Action<string> log) => (this.game, this.log) = (game, log);
@@ -23,6 +25,12 @@ public sealed class PluginHost : IDisposable
     // Lifecycle operations are called on the Unity thread.
     public void Start(string packages, string profileFile, string data)
     {
+        if (frameworkScope == null)
+        {
+            frameworkScope = new Scope("framework", data, default, game, log);
+            framework.Start(frameworkScope, new UnityLogForwarder(), "Unity 日志");
+            framework.Start(frameworkScope, new SettingsShortcut(), "设置快捷键");
+        }
         var catalog = Catalog.Discover(packages, log);
         var profile = Catalog.ReadProfile(profileFile, catalog);
         foreach (var id in profile.Enabled.Distinct(StringComparer.Ordinal))
@@ -66,6 +74,25 @@ public sealed class PluginHost : IDisposable
             Stop(item.Plugin, item.Scope, item.Loader);
         }
         running.Clear();
+        frameworkScope?.Dispose();
+        frameworkScope = null;
+        framework.Dispose();
+    }
+
+    public static async Task<int> UpdateResourcesAsync(Package package, string dataDirectory, string? source)
+    {
+        var manifest = package.Manifest;
+        if (manifest.ApiVersion != Catalog.ApiVersion || string.IsNullOrWhiteSpace(manifest.ResourceUpdater))
+            throw new InvalidOperationException($"{manifest.Name} 没有兼容的资源更新入口。");
+        var loader = new PackageLoader(package.Directory);
+        try
+        {
+            var assembly = loader.LoadFromAssemblyPath(Path.GetFullPath(Path.Combine(package.Directory, manifest.Assembly)));
+            var type = assembly.GetType(manifest.ResourceUpdater, throwOnError: true)!;
+            var updater = Activator.CreateInstance(type) as IResourceUpdater ?? throw new InvalidDataException("资源更新入口未实现 IResourceUpdater。");
+            return await updater.UpdateAsync(Path.GetFullPath(dataDirectory), source).ConfigureAwait(false);
+        }
+        finally { loader.Unload(); }
     }
 
     private sealed class PackageLoader : AssemblyLoadContext

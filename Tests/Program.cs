@@ -17,6 +17,7 @@ try
     VerifyPurchase(work, packages);
     VerifyCameraPhysics(work, packages);
     VerifyDisplayOptions(work, packages);
+    VerifyFrameworkAndCapture(work, packages);
     VerifyUpdate(work);
     VerifyManager(work, Path.GetDirectoryName(Path.GetFullPath(packages))!);
     if (args.Length > 2) VerifyPack(args[2]);
@@ -58,7 +59,7 @@ static void Verify(string work, string packages)
     using (var host = new PluginHost(testGame, log.Add))
     {
         host.Start(packages, profile, work);
-        Check(host.Active.Count == 0 && testGame.Live == 0, "空配置");
+        Check(host.Active.Count == 0 && testGame.Live == 1, "空配置仍转发 Unity 日志");
         File.WriteAllText(profile, """{"enabled":["missing","i18n","frame-rate","text","story","text"],"settings":{"frame-rate":{"fps":-4}}}""");
         host.Start(packages, profile, work);
         Check(host.Active.SequenceEqual(new[]{"localization"}), string.Join(Environment.NewLine, log));
@@ -191,7 +192,7 @@ static void VerifyTextBundle(string work, string packages)
     disabled.Start(packages, profile, work);
     card = new Card(); card.InternalMergeFrom(); live = new LivePresenter(); live.SetLyricsActive(false);
     ui.SetValue("key", "original"); tmp.SetText("歌の一節"); new TMPro.TextMeshProUGUI().Awake();
-    Check(disabled.Active.Count == 0 && game.Live == 0 && ui.Value == "original" && tmp.Value == "歌の一節" &&
+    Check(disabled.Active.Count == 0 && game.Live == 1 && ui.Value == "original" && tmp.Value == "歌の一節" &&
           card.Name == "" && !live.Visible && TMPro.TMP_Settings.fallbackFontAssets.Count == 0 &&
           UnityEngine.Resources.LastClone!.Destroyed, "关闭一个插件后移除全部回调和资源");
 }
@@ -272,6 +273,51 @@ static void VerifyPurchase(string work, string packages)
     Check(manager.CheckPurchaseAsync(null, default).Result.CanPurchase && manager.Calls == 1, "移除充值保护后恢复原回调");
 }
 
+static void VerifyFrameworkAndCapture(string work, string packages)
+{
+    var data = Directory.CreateDirectory(Path.Combine(work, "capture-fixture")).FullName;
+    var root = Directory.CreateDirectory(Path.Combine(data, "re")).FullName;
+    // Only the U-key path is exercised. No GUI process is launched by this fixture.
+    File.WriteAllBytes(Path.Combine(root, "Gkms.Manager.exe"), Array.Empty<byte>());
+    var profile = Path.Combine(root, "profile.json");
+    File.WriteAllText(profile, """{"enabled":["settings-panel","unity-log"]}""");
+    var game = new TestGame();
+    var log = new List<string>();
+    var key = new Ui();
+    var tmp = new Tmp();
+    var canvas = new UnityEngine.CanvasRenderer();
+    var quality = new Campus.Common.CampusQualityManager();
+    var texture = new UnityEngine.Texture2D(8, 8) { name = "atlas" };
+    var textFile = Path.Combine(data, "dump-files", "observed.jsonl");
+    using (var host = new PluginHost(game, log.Add))
+    {
+        host.Start(packages, profile, data);
+        host.Start(packages, profile, data);
+        Check(game.Live == 2 && host.Active.Count == 0, "不启用插件也只注册一次两项框架服务");
+        UnityEngine.DebugLogHandler.Internal_Log(0, 0, "offline", null);
+        UnityEngine.Input.U = true;
+        quality.Update();
+        Check(log.Count(line => line == "framework: offline") == 1 && UnityEngine.Input.CtrlReads == 2, "框架日志和 Ctrl+U 输入回调");
+
+        File.WriteAllText(profile, """{"enabled":["texture-capture","capture"]}""");
+        host.Start(packages, profile, data);
+        key.SetValue("menu", "原文"); key.SetValue("menu", "原文"); tmp.text = "台词";
+        canvas.SetTexture(texture); canvas.SetTexture(texture);
+        var png = File.ReadAllBytes(Path.Combine(data, "dump-files", "texture2d", "atlas.png"));
+        Check(host.Active.SequenceEqual(new[]{ "capture" }) && png.SequenceEqual(new byte[] { 137, 80, 78, 71 }),
+              "一个采集开关同时导出文本和贴图");
+    }
+    UnityEngine.Input.U = true; quality.Update();
+    UnityEngine.DebugLogHandler.Internal_Log(0, 0, "after-dispose", null);
+    tmp.text = "已卸载"; canvas.SetTexture(new UnityEngine.Texture2D(8, 8) { name = "after" });
+    var lines = File.ReadAllLines(textFile);
+    using var capture = JsonDocument.Parse("[" + string.Join(",", lines) + "]");
+    var values = capture.RootElement.EnumerateArray().Select(row => row.GetProperty("value").GetString()).ToArray();
+    Check(game.Live == 0 && !log.Any(line => line.Contains("after-dispose")) && values.SequenceEqual(new[] { "原文", "台词" }) &&
+          !File.Exists(Path.Combine(data, "dump-files", "texture2d", "after.png")), "卸载时释放宿主和采集回调");
+    UnityEngine.Input.U = false;
+}
+
 static void VerifyManager(string work, string distribution)
 {
     var data = Directory.CreateDirectory(Path.Combine(work, "manager-fixture", "gakumas-local")).FullName;
@@ -282,6 +328,8 @@ static void VerifyManager(string work, string distribution)
     {
         var folder = Directory.CreateDirectory(Path.Combine(root, "plugins", id)).FullName;
         File.Copy(Path.Combine(package.Directory, "plugin.json"), Path.Combine(folder, "plugin.json"));
+        if (package.Manifest.ResourceUpdater != null)
+            File.Copy(Path.Combine(package.Directory, package.Manifest.Assembly), Path.Combine(folder, package.Manifest.Assembly));
     }
     int Run(params string[] args)
     {
@@ -294,7 +342,8 @@ static void VerifyManager(string work, string distribution)
     }
     var pluginDir = Path.Combine(root, "plugins");
     var onlyOld = new Dictionary<string, Package>();
-    foreach (var (id, assembly) in new[] { ("i18n", "I18n"), ("master", "Master"), ("lyrics", "Lyrics") })
+    foreach (var (id, assembly) in new[] { ("i18n", "I18n"), ("master", "Master"), ("lyrics", "Lyrics"),
+        ("texture-capture", "TextureCapture"), ("settings-panel", "SettingsPanel"), ("unity-log", "UnityLog") })
     {
         var former = Directory.CreateDirectory(Path.Combine(pluginDir, "obsolete-" + id)).FullName;
         var manifest = new Manifest(id, id, 1, $"Gkms.{assembly}.dll", $"Gkms.Plugins.{assembly}.Plugin");
@@ -304,6 +353,8 @@ static void VerifyManager(string work, string distribution)
     var current = Catalog.Discover(pluginDir, _ => {});
     Check(current.ContainsKey("localization") && !onlyOld.Keys.Any(current.ContainsKey), "覆盖安装时只显示一个文本汉化包");
     var fileName = Path.Combine(root, "profile.json");
+    File.WriteAllText(fileName, """{"enabled":["texture-capture","settings-panel","capture","unity-log"]}""");
+    Check(Catalog.ReadProfile(fileName, current).Enabled.SequenceEqual(new[] { "capture" }), "旧采集和内置功能迁移");
     foreach (var id in new[] { "localization", "master", "lyrics", "font", "story", "subtitles", "i18n", "text" })
     {
         File.WriteAllText(fileName, JsonSerializer.Serialize(new { enabled = new[] { id } }));
@@ -321,13 +372,34 @@ static void VerifyManager(string work, string distribution)
               "保存配置时合并重复项并移除分项开关");
     Check(Run("disable", "localization") == 0 && Catalog.ReadProfile(fileName, current).Enabled.Length == 0, "总开关可一并关闭");
     File.WriteAllText(Path.Combine(data, "localizationConfig.json"),
-        """{"enabled":true,"targetFrameRate":120,"replaceFont":false,"enableFreeCamera":true,"loginAsIOS":true}""");
+        """{"enabled":true,"targetFrameRate":120,"replaceFont":false,"dumpRuntimeTexture":true,"enableFreeCamera":true,"loginAsIOS":true}""");
     Check(Run("import-legacy") == 0, "旧版选项导入");
     var imported = Catalog.ReadProfile(fileName);
     Check(imported.Enabled.Contains("camera") && imported.Enabled.Contains("frame-rate") && imported.Enabled.Contains("purchase-guard") &&
-        imported.Enabled.Contains("localization") && !imported.Settings!["localization"].TryGetProperty("font", out _) &&
+        imported.Enabled.Contains("localization") && imported.Enabled.Contains("capture") && !imported.Settings!["localization"].TryGetProperty("font", out _) &&
         imported.Settings!["frame-rate"].GetProperty("fps").GetInt32() == 120 &&
         imported.Settings["camera"].GetProperty("speed").GetInt32() == 5, "旧版参数迁移");
+
+    static string MakeArchive(string root, string name, params (string Path, string Content)[] entries)
+    {
+        var path = Path.Combine(root, name + ".zip");
+        using var archive = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Create);
+        foreach (var entry in entries)
+        {
+            using var writer = new StreamWriter(archive.CreateEntry(entry.Path).Open());
+            writer.Write(entry.Content);
+        }
+        return path;
+    }
+    var textZip = MakeArchive(root, "text", ("local-files/localization.json", """{"ui":"中文"}"""));
+    var texZip = MakeArchive(root, "textures", ("texture2d/texture_version.txt", "v1"), ("texture2d/title.png", "fixture"));
+    File.WriteAllText(Path.Combine(data, "config.json"), JsonSerializer.Serialize(new { useAPIAssetsURL = textZip, useAPITextureAssetsURL = texZip }));
+    Check(Run("disable", "localization", "textures") == 0 && Run("update", "localization") == 0 && Run("update", "textures", texZip) == 0,
+          "插件未启用也可通过管理器调用各自 DLL 的更新入口");
+    Check(File.ReadAllText(Path.Combine(data, "local-files", "localization.json")).Contains("中文") &&
+          File.ReadAllText(Path.Combine(data, "texture2d", "title.png")) == "fixture", "两种资源进入各自目录");
+    Check(Run("update", "textures", textZip) != 0 && Run("update", "capture", texZip) != 0 &&
+          File.Exists(Path.Combine(data, "texture2d", "title.png")), "错误的包类型或不支持更新的插件不会改写资源");
 }
 
 static void VerifyUpdate(string work)
@@ -416,6 +488,7 @@ public sealed class Ui
 public sealed class Tmp
 {
     public string Value = "";
+    public string text { get => Value; [MethodImpl(MethodImplOptions.NoInlining)] set => Value = value; }
     [MethodImpl(MethodImplOptions.NoInlining)] public void SetText(string value) => Value = value;
     [MethodImpl(MethodImplOptions.NoInlining)] public void SetText(string value, bool sync) => Value = value;
 }

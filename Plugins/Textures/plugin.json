@@ -3,5 +3,6 @@
   "name": "界面贴图替换",
   "apiVersion": 1,
   "assembly": "Gkms.Textures.dll",
-  "entryPoint": "Gkms.Plugins.Textures.Plugin"
+  "entryPoint": "Gkms.Plugins.Textures.Plugin",
+  "resourceUpdater": "Gkms.Plugins.Textures.ResourceUpdater"
 }

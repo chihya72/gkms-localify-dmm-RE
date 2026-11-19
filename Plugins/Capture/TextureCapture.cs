@@ -1,9 +1,9 @@
 using System.Reflection;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.TextureCapture;
+namespace Gkms.Plugins.Capture;
 
-public sealed class Plugin : ILocalifyPlugin
+internal sealed class TextureCapture : ILocalifyPlugin
 {
     private static readonly HashSet<int> seen = new();
     private static MethodInfo temporary = null!, release = null!, blit = null!, read = null!, apply = null!, encode = null!, destroy = null!, instanceId = null!;
@@ -29,7 +29,7 @@ public sealed class Plugin : ILocalifyPlugin
         destroy = ctx.Require(core, "UnityEngine.Object", "Destroy", "UnityEngine.Object");
         instanceId = ctx.Require(core, "UnityEngine.Object", "GetInstanceID");
         ctx.Patch(ctx.Require("UnityEngine.UIModule", "UnityEngine.CanvasRenderer", "SetTexture", "UnityEngine.Texture"),
-            GameMethods.Handler<Plugin>(nameof(Capture)), priority: 800);
+            GameMethods.Handler<TextureCapture>(nameof(Capture)), priority: 800);
     }
 
     public static void Capture(object __0)

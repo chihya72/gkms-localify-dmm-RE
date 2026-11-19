@@ -35,18 +35,32 @@ internal sealed class PluginPicker : Form
         var status = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft,
             Text = errors.Count == 0 ? "勾选需要的插件。保存后，下次进入游戏时生效。" : string.Join(Environment.NewLine, errors) };
         var edit = new Button { Text = "编辑参数", AutoSize = true, Enabled = false };
-        plugins.SelectedIndexChanged += (_, _) => edit.Enabled = plugins.SelectedItems.Count == 1 &&
-            (string)plugins.SelectedItems[0].Tag != "localization" && catalog.ContainsKey((string)plugins.SelectedItems[0].Tag);
+        var update = new Button { Text = "更新资源…", AutoSize = true, Enabled = false };
+        plugins.SelectedIndexChanged += (_, _) =>
+        {
+            var package = plugins.SelectedItems.Count == 1 ? catalog.GetValueOrDefault((string)plugins.SelectedItems[0].Tag) : null;
+            edit.Enabled = package != null && package.Manifest.Id != "localization" && package.Manifest.Id != "capture";
+            update.Enabled = package?.Manifest.ResourceUpdater != null && package.Manifest.ApiVersion == Catalog.ApiVersion;
+        };
+        update.Click += (_, _) =>
+        {
+            if (plugins.SelectedItems.Count != 1) return;
+            var package = catalog[(string)plugins.SelectedItems[0].Tag];
+            using var dialog = new ResourceUpdateDialog(package, Path.Combine(root, ".."));
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+                status.Text = $"{package.Manifest.Name} 已更新 {dialog.Installed} 个资源文件。";
+        };
         edit.Click += (_, _) =>
         {
             if (plugins.SelectedItems.Count != 1) return;
             try { PluginOptions.Edit(this, root, catalog[(string)plugins.SelectedItems[0].Tag], catalog); }
             catch (Exception e) { MessageBox.Show(this, e.Message, "读取失败", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         };
-        var bar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 48, ColumnCount = 3, Padding = new Padding(0, 8, 0, 0) };
+        var bar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 48, ColumnCount = 4, Padding = new Padding(0, 8, 0, 0) };
         bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        bar.Controls.Add(status, 0, 0); bar.Controls.Add(edit, 1, 0); bar.Controls.Add(save, 2, 0);
+        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bar.Controls.Add(status, 0, 0); bar.Controls.Add(update, 1, 0); bar.Controls.Add(edit, 2, 0); bar.Controls.Add(save, 3, 0);
         Controls.Add(plugins); Controls.Add(bar);
         plugins.ItemChecked += (_, _) => save.Enabled = true;
         save.Click += (_, _) =>

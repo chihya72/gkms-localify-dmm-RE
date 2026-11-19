@@ -4,7 +4,7 @@ namespace Gkms.Plugins.Localization;
 
 public sealed class Plugin : ILocalifyPlugin
 {
-    private readonly Stack<ILocalifyPlugin> started = new();
+    private readonly PluginComponents started = new();
 
     public void Start(IPluginContext context)
     {
@@ -25,24 +25,9 @@ public sealed class Plugin : ILocalifyPlugin
         void StartFeature(string name, ILocalifyPlugin feature, bool installed = true)
         {
             if (!installed) { context.Log($"{name} 缺少对应资源，已跳过。"); return; }
-            var scope = ((IPluginScope)context).OpenScope();
-            try { feature.Start(scope); started.Push(feature); }
-            catch (Exception error)
-            {
-                scope.Dispose();
-                context.Log($"{name} 加载失败: {error.GetBaseException().Message}");
-                try { feature.Dispose(); }
-                catch (Exception cleanup) { context.Log($"{name} 清理失败: {cleanup.GetBaseException().Message}"); }
-            }
+            started.Start(context, feature, name);
         }
     }
 
-    public void Dispose()
-    {
-        List<Exception>? errors = null;
-        while (started.TryPop(out var feature))
-            try { feature.Dispose(); }
-            catch (Exception error) { (errors ??= new()).Add(error); }
-        if (errors != null) throw new AggregateException(errors);
-    }
+    public void Dispose() => started.Dispose();
 }
