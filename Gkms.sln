@@ -8,19 +8,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Manager", "Manager\Gkm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.BepInEx", "Bridge\Gkms.BepInEx.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000004}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.I18n", "Plugins\I18n\Gkms.I18n.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000005}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Text", "Plugins\Text\Gkms.Text.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000006}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Story", "Plugins\Story\Gkms.Story.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000007}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Localization", "Plugins\Localization\Gkms.Localization.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000006}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Master", "Plugins\Master\Gkms.Master.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000008}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Font", "Plugins\Font\Gkms.Font.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000009}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Textures", "Plugins\Textures\Gkms.Textures.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000000A}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Subtitles", "Plugins\Subtitles\Gkms.Subtitles.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000000B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Graphics", "Plugins\Graphics\Gkms.Graphics.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000000C}"
 EndProject
@@ -48,6 +40,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Resources", "Tools\Res
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.TextureCapture", "Plugins\TextureCapture\Gkms.TextureCapture.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000018}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.PurchaseGuard", "Plugins\PurchaseGuard\Gkms.PurchaseGuard.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000019}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.SettingsPanel", "Plugins\SettingsPanel\Gkms.SettingsPanel.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000001A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.ScheduleSp", "Plugins\ScheduleSp\Gkms.ScheduleSp.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000001B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.CardCutIn", "Plugins\CardCutIn\Gkms.CardCutIn.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000001C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -70,34 +70,18 @@ Global
 		{BDFB3E88-3164-49F0-AB5A-000000000004}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000004}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000004}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000005}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000005}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000005}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000005}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000006}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000006}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000006}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000006}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000007}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000007}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000007}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000007}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000008}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000008}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000008}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000008}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000009}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000009}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000009}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000009}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-00000000000B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-00000000000B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-00000000000B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-00000000000B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-00000000000C}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -150,5 +134,21 @@ Global
 		{BDFB3E88-3164-49F0-AB5A-000000000018}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000018}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000018}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-000000000019}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-000000000019}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-000000000019}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-000000000019}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDFB3E88-3164-49F0-AB5A-00000000001C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

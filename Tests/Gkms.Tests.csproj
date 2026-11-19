@@ -3,10 +3,16 @@
   <ItemGroup>
     <ProjectReference Include="..\Host\Gkms.Host.csproj" />
     <ProjectReference Include="..\Tools\Resources\Gkms.Resources.csproj" />
-    <ProjectReference Include="..\Plugins\Text\Gkms.Text.csproj" />
+    <ProjectReference Include="..\Plugins\Localization\Gkms.Localization.csproj" />
+    <ProjectReference Include="..\Plugins\PurchaseGuard\Gkms.PurchaseGuard.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Plugins\Master\Gkms.Master.csproj" />
-    <ProjectReference Include="..\Plugins\I18n\Gkms.I18n.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Story\Gkms.Story.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Plugins\ScheduleSp\Gkms.ScheduleSp.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Plugins\CardCutIn\Gkms.CardCutIn.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Plugins\Camera\Gkms.Camera.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Plugins\Physics\Gkms.Physics.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Plugins\Graphics\Gkms.Graphics.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Plugins\Textures\Gkms.Textures.csproj" ReferenceOutputAssembly="false" />
+
     <ProjectReference Include="..\Plugins\FrameRate\Gkms.FrameRate.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="HarmonyX" Version="2.10.2" />
   </ItemGroup>

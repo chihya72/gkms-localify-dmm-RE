@@ -24,6 +24,17 @@ public sealed class Plugin : ILocalifyPlugin
         setReflection = methods.SingleOrDefault(m => m.Name == "SetReflectionQuality" && m.GetParameters().Length == 1);
         setLod = methods.SingleOrDefault(m => m.Name == "SetLODQuality" && m.GetParameters().Length == 1);
         context.Patch(target, GameMethods.Handler<Plugin>(nameof(Apply)));
+        if (scale > 1)
+        {
+            var limited = context.Require("vl-unity.Runtime", "VL.VLUtility", "GetLimitedResolution",
+                "System.Int32", "System.Int32", "UnityEngine.Vector2", "System.Int32", "System.Single", "System.Boolean");
+            context.Patch(limited, GameMethods.Handler<Plugin>(nameof(ScaleResolution)));
+        }
+    }
+    public static void ScaleResolution(ref int __0, ref int __1)
+    {
+        __0 = (int)Math.Clamp((double)__0 * scale, 1, int.MaxValue);
+        __1 = (int)Math.Clamp((double)__1 * scale, 1, int.MaxValue);
     }
     private static void SetLevel(object instance, MethodInfo? method, int index)
     {

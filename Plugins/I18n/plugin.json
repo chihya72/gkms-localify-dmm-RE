@@ -1,7 +1,0 @@
-{
-  "id": "i18n",
-  "name": "界面键值翻译",
-  "apiVersion": 1,
-  "assembly": "Gkms.I18n.dll",
-  "entryPoint": "Gkms.Plugins.I18n.Plugin"
-}

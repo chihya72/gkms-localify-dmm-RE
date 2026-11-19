@@ -1,0 +1,7 @@
+{
+  "id": "settings-panel",
+  "name": "游戏内设置快捷键",
+  "apiVersion": 1,
+  "assembly": "Gkms.SettingsPanel.dll",
+  "entryPoint": "Gkms.Plugins.SettingsPanel.Plugin"
+}

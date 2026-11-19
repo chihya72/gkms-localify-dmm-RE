@@ -1,9 +1,9 @@
 using System.Reflection;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.Font;
+namespace Gkms.Plugins.Localization;
 
-public sealed class Plugin : ILocalifyPlugin
+public sealed class FallbackFont : ILocalifyPlugin
 {
     private static MethodInfo loadBundle = null!, loadAsset = null!, create = null!, unload = null!, destroy = null!, alive = null!;
     private static PropertyInfo fallback = null!;
@@ -31,7 +31,7 @@ public sealed class Plugin : ILocalifyPlugin
         fallback = session.RequireType("Unity.TextMeshPro", "TMPro.TMP_Settings").GetProperty("fallbackFontAssets")
             ?? throw new MissingMemberException("TMP_Settings.fallbackFontAssets");
         session.Patch(session.Require("Unity.TextMeshPro", "TMPro.TextMeshProUGUI", "Awake"),
-            GameMethods.Handler<Plugin>(nameof(EnsureFont)));
+            GameMethods.Handler<FallbackFont>(nameof(EnsureFont)));
     }
 
     public static void EnsureFont()

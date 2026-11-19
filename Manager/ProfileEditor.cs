@@ -7,12 +7,13 @@ namespace Gkms.Manager;
 internal static class ProfileEditor
 {
     public static void Apply(string root, IReadOnlyDictionary<string, Package> catalog, IReadOnlyDictionary<string, bool> changes,
-        IReadOnlyDictionary<string, JsonObject>? importedSettings = null)
+        IReadOnlyDictionary<string, JsonObject>? importedSettings = null, KeyValuePair<string, JsonObject>? replace = null)
     {
         using var editLock = new FileStream(Path.Combine(root, "profile.edit"), FileMode.OpenOrCreate,
             FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose);
         var file = Path.Combine(root, "profile.json");
-        var enabled = Catalog.ReadProfile(file).Enabled.Distinct(StringComparer.Ordinal).ToList();
+        var current = Catalog.ReadProfile(file, catalog);
+        var enabled = current.Enabled.Distinct(StringComparer.Ordinal).ToList();
         foreach (var (id, selected) in changes)
         {
             if (!selected) { enabled.Remove(id); continue; }
@@ -22,6 +23,7 @@ internal static class ProfileEditor
         }
         var profile = File.Exists(file) ? JsonNode.Parse(File.ReadAllText(file))!.AsObject() : new JsonObject();
         profile["enabled"] = JsonSerializer.SerializeToNode(enabled);
+        if (current.Settings != null) profile["settings"] = JsonSerializer.SerializeToNode(current.Settings);
         if (importedSettings != null)
         {
             var options = (profile["settings"] ??= new JsonObject()).AsObject();
@@ -31,6 +33,8 @@ internal static class ProfileEditor
                 foreach (var (key, value) in values) existing[key] = value == null ? null : JsonNode.Parse(value.ToJsonString());
             }
         }
+        if (replace is { } edit)
+            (profile["settings"] ??= new JsonObject()).AsObject()[edit.Key] = edit.Value;
         var temp = file + ".tmp";
         try
         {

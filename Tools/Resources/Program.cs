@@ -25,11 +25,7 @@ try
             {
                 using var release = JsonDocument.Parse(await client.GetStringAsync(uri));
                 version = release.RootElement.GetProperty("tag_name").GetString();
-                var assets = release.RootElement.GetProperty("assets").EnumerateArray()
-                    .Where(a => a.GetProperty("name").GetString()!.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(a => args[0] == "textures" && a.GetProperty("name").GetString()!.Equals("texture2d.zip", StringComparison.OrdinalIgnoreCase));
-                uri = new Uri(assets.First().GetProperty("browser_download_url").GetString()!);
-                if (uri.Scheme is not ("http" or "https")) throw new InvalidDataException("发布包地址无效。");
+                uri = PackInstaller.SelectReleaseZip(release.RootElement, args[0] == "textures");
             }
             download = Path.Combine(AppContext.BaseDirectory, Guid.NewGuid().ToString("N") + ".zip");
             using (var stream = await client.GetStreamAsync(uri))

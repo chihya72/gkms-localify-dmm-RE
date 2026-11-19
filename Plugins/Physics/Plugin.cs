@@ -7,6 +7,7 @@ public sealed class Plugin : ILocalifyPlugin
 {
     private static readonly Dictionary<string, object> values = new();
     private static PropertyInfo bones = null!;
+    private static BoneLimits limits = null!;
     public void Start(IPluginContext context)
     {
         foreach (var (name, fallback) in new Dictionary<string, float> { ["damping"]=.33f, ["stiffness"]=.08f,
@@ -17,6 +18,7 @@ public sealed class Plugin : ILocalifyPlugin
             values[name] = value;
         }
         values["useArmCorrection"] = context.Option("useArmCorrection", true);
+        limits = new BoneLimits(context);
         var target = context.RequireType("campus-submodule.Runtime", "Campus.Common.CampusActorAnimation")
             .GetMethods(GameMethods.Declared).Single(m => m.Name == "Setup" && m.GetParameters() is [_, { ParameterType.Name: "CampusActorAnimationInitializeData" }]);
         bones = target.GetParameters()[1].ParameterType.GetProperty("swingBreastBones") ?? throw new MissingMemberException("swingBreastBones");
@@ -33,6 +35,7 @@ public sealed class Plugin : ILocalifyPlugin
         {
             if (index.GetValue(list, new object[] { i }) is not { } bone) continue;
             foreach (var (key, value) in values) bone.GetType().GetProperty(key)?.SetValue(bone, value);
+            limits.Apply(bone);
         }
     }
     public void Dispose() => values.Clear();

@@ -34,7 +34,7 @@ internal static class Program
         }
         if (args[0] == "list")
         {
-            var enabled = Catalog.ReadProfile(Path.Combine(root, "profile.json")).Enabled;
+            var enabled = Catalog.ReadProfile(Path.Combine(root, "profile.json"), catalog).Enabled;
             foreach (var (id, p) in catalog.OrderBy(p => p.Key))
                 Console.WriteLine($"{(enabled.Contains(id) ? "[x]" : "[ ]")} {id,-20} {p.Manifest.Name} (API {p.Manifest.ApiVersion})");
             foreach (var id in enabled.Except(catalog.Keys)) Console.WriteLine($"[?] {id}  插件包缺失");

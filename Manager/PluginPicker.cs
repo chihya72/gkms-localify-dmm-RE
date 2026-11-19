@@ -23,7 +23,7 @@ internal sealed class PluginPicker : Form
         plugins.Columns.Add("接口版本", 95);
         var errors = new List<string>();
         catalog = Catalog.Discover(Path.Combine(root, "plugins"), errors.Add);
-        initial = Catalog.ReadProfile(Path.Combine(root, "profile.json")).Enabled.ToHashSet();
+        initial = Catalog.ReadProfile(Path.Combine(root, "profile.json"), catalog).Enabled.ToHashSet();
         foreach (var (id, package) in catalog.OrderBy(p => p.Key))
         {
             var m = package.Manifest;
@@ -34,9 +34,19 @@ internal sealed class PluginPicker : Form
             plugins.Items.Add(new ListViewItem(new[] { "插件包缺失", missing, "—" }) { Checked = true, Tag = missing });
         var status = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft,
             Text = errors.Count == 0 ? "勾选需要的插件。保存后，下次进入游戏时生效。" : string.Join(Environment.NewLine, errors) };
-        var bar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 48, ColumnCount = 2, Padding = new Padding(0, 8, 0, 0) };
+        var edit = new Button { Text = "编辑参数", AutoSize = true, Enabled = false };
+        plugins.SelectedIndexChanged += (_, _) => edit.Enabled = plugins.SelectedItems.Count == 1 &&
+            catalog.ContainsKey((string)plugins.SelectedItems[0].Tag);
+        edit.Click += (_, _) =>
+        {
+            if (plugins.SelectedItems.Count != 1) return;
+            try { PluginOptions.Edit(this, root, catalog[(string)plugins.SelectedItems[0].Tag], catalog); }
+            catch (Exception e) { MessageBox.Show(this, e.Message, "读取失败", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        };
+        var bar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 48, ColumnCount = 3, Padding = new Padding(0, 8, 0, 0) };
         bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        bar.Controls.Add(status, 0, 0); bar.Controls.Add(save, 1, 0);
+        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bar.Controls.Add(status, 0, 0); bar.Controls.Add(edit, 1, 0); bar.Controls.Add(save, 2, 0);
         Controls.Add(plugins); Controls.Add(bar);
         plugins.ItemChecked += (_, _) => save.Enabled = true;
         save.Click += (_, _) =>

@@ -1,7 +1,0 @@
-{
-  "id": "text",
-  "name": "通用文本翻译",
-  "apiVersion": 1,
-  "assembly": "Gkms.Text.dll",
-  "entryPoint": "Gkms.Plugins.Text.Plugin"
-}

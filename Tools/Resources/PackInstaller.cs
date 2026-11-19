@@ -5,6 +5,19 @@ namespace Gkms.Resources;
 
 public static class PackInstaller
 {
+    public static Uri SelectReleaseZip(JsonElement release, bool textures)
+    {
+        var zips = release.GetProperty("assets").EnumerateArray()
+            .Select(a => (Name: a.GetProperty("name").GetString()!, Url: a.GetProperty("browser_download_url").GetString()!))
+            .Where(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+        var preferred = textures ? "texture2d.zip" : "GakumasTranslationData.zip";
+        var asset = zips.Where(a => textures || !a.Name.Equals("texture2d.zip", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(a => a.Name.Equals(preferred, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+        if (!Uri.TryCreate(asset.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+            throw new InvalidDataException("发布页缺少相应的资源 ZIP 地址。");
+        return uri;
+    }
+
     // The distribution marker identifies the payload, including release ZIPs with a wrapper folder.
     public static int Install(string data, bool textures, ZipArchive archive, string? release)
     {

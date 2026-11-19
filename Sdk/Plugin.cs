@@ -17,6 +17,11 @@ public interface IPluginContext
     void Patch(MethodInfo target, MethodInfo? prefix = null, MethodInfo? postfix = null, int priority = 400);
 }
 
+public interface IPluginScope : IPluginContext, IDisposable
+{
+    IPluginScope OpenScope();
+}
+
 public static class GameMethods
 {
     public const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic |

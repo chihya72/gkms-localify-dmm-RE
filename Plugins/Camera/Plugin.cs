@@ -14,7 +14,13 @@ public sealed class Plugin : ILocalifyPlugin
     private static PropertyInfo? index, rotation;
     private static MethodInfo? getBone, point, lookAt, alive;
     private static object? headBone, offset;
+    private static PropertyInfo? rootBody;
+    private static HeadVisibility? head;
     private static bool active;
+    private static float? zoom;
+    private static object? zoomCamera;
+    private static float originalZoom;
+    private static PropertyInfo? fieldOfView;
     private static int lastFrame = -1;
     public void Start(IPluginContext context)
     {
@@ -31,6 +37,10 @@ public sealed class Plugin : ILocalifyPlugin
         var brain = context.RequireType("Cinemachine", "Cinemachine.CinemachineBrain");
         output = brain.GetProperty("OutputCamera")!;
         transform = output.PropertyType.GetProperty("transform")!;
+        fieldOfView = output.PropertyType.GetProperty("fieldOfView");
+        var depthOfField = context.Find("Unity.RenderPipelines.Universal.Runtime", "VL.Rendering.VLDOF", "IsActive");
+        if (depthOfField != null)
+            context.Patch(depthOfField, postfix: GameMethods.Handler<Plugin>(nameof(DepthOfField)));
         position = transform.PropertyType.GetProperty("position")!;
         angles = transform.PropertyType.GetProperty("eulerAngles")!;
         translate = transform.PropertyType.GetMethod("Translate", new[] { typeof(float), typeof(float), typeof(float) })!;
@@ -48,6 +58,11 @@ public sealed class Plugin : ILocalifyPlugin
             point = context.Require("UnityEngine.CoreModule", "UnityEngine.Transform", "TransformPoint", "UnityEngine.Vector3");
             lookAt = context.Require("UnityEngine.CoreModule", "UnityEngine.Transform", "LookAt", "UnityEngine.Transform");
             alive = context.Require("UnityEngine.CoreModule", "UnityEngine.Object", "op_Implicit", "UnityEngine.Object");
+            if (mode == "first-person" && context.Option("hideHead", true))
+            {
+                rootBody = actor.GetProperty("_rootBody", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (rootBody != null) head = new HeadVisibility(alive);
+            }
             rotation = transform.PropertyType.GetProperty("rotation")!;
             var displacement = context.Option("offset", mode == "follow" ? new[] { 0f, .25f, -1.5f } : new[] { 0f, .064f, .12f });
             if (displacement.Length != 3 || displacement.Any(v => !float.IsFinite(v))) throw new InvalidDataException("offset 需要三个有限数值。");
@@ -62,8 +77,24 @@ public sealed class Plugin : ILocalifyPlugin
     private static float Axis(string name) => (float)axis.Invoke(null, new object[] { name })!;
     public static void Track(object __instance)
     {
-        if (active && (index == null || Convert.ToInt32(index.GetValue(__instance)) == actorIndex))
-            trackedBone = getBone!.Invoke(__instance, new[] { headBone });
+        if (!active || index != null && Convert.ToInt32(index.GetValue(__instance)) != actorIndex) return;
+        trackedBone = getBone!.Invoke(__instance, new[] { headBone });
+        if (head != null)
+        {
+            var body = rootBody!.GetValue(__instance);
+            head.Track(trackedBone == null || body == null ? null : body.GetType().GetProperty("parent")!.GetValue(body));
+        }
+    }
+
+    public static void DepthOfField(ref bool __result) { if (active) __result = false; }
+
+    private static void ResetZoom()
+    {
+        if (zoomCamera != null && zoom.HasValue && (alive == null || (bool)alive.Invoke(null, new[] { zoomCamera })!) &&
+            (float)fieldOfView!.GetValue(zoomCamera)! == zoom.Value)
+            fieldOfView.SetValue(zoomCamera, originalZoom);
+        zoomCamera = null;
+        zoom = null;
     }
 
     public static void Update(object __instance)
@@ -71,8 +102,23 @@ public sealed class Plugin : ILocalifyPlugin
         var currentFrame = (int)frame.GetValue(null)!;
         if (currentFrame == lastFrame) return;
         lastFrame = currentFrame;
-        if ((bool)pressed.Invoke(null, new object[] { "f8" })!) { active = !active; savedPosition = null; }
+        if ((bool)pressed.Invoke(null, new object[] { "f8" })!)
+        {
+            active = !active; savedPosition = trackedBone = null; ResetZoom();
+            if (!active) head?.Restore();
+        }
         if (!active || output.GetValue(__instance) is not { } camera || transform.GetValue(camera) is not { } t) return;
+        if (fieldOfView != null)
+        {
+            var wheel = Axis("Mouse ScrollWheel");
+            if (zoomCamera != null && !Equals(camera, zoomCamera)) ResetZoom();
+            if (wheel != 0)
+            {
+                if (zoomCamera == null) { zoomCamera = camera; originalZoom = (float)fieldOfView.GetValue(camera)!; }
+                zoom = Math.Clamp((zoom ?? originalZoom) - wheel * 10, 1, 179);
+            }
+            if (zoom.HasValue) fieldOfView.SetValue(camera, zoom.Value);
+        }
         if (mode != "free")
         {
             if (trackedBone == null || !(bool)alive!.Invoke(null, new[] { trackedBone })!) return;
@@ -96,5 +142,5 @@ public sealed class Plugin : ILocalifyPlugin
         translate.Invoke(t, new object[] { (Key("d")-Key("a"))*step, (Key("e")-Key("q"))*step, (Key("w")-Key("s"))*step });
         savedPosition = position.GetValue(t);
     }
-    public void Dispose() { active = false; savedPosition = null; trackedBone = null; }
+    public void Dispose() { head?.Restore(); ResetZoom(); head = null; active = false; savedPosition = null; trackedBone = null; }
 }

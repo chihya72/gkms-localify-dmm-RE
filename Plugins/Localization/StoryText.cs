@@ -1,9 +1,9 @@
 using System.Reflection;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.Story;
+namespace Gkms.Plugins.Localization;
 
-public sealed class Plugin : ILocalifyPlugin
+public sealed class StoryText : ILocalifyPlugin
 {
     private static string? root;
     private static MethodInfo? invoke;
@@ -17,7 +17,7 @@ public sealed class Plugin : ILocalifyPlugin
             name == typeof(string) && callback.IsGenericType &&
             callback.GetGenericArguments()[0].FullName is "System.String" or "Il2CppSystem.String");
         invoke = method.GetParameters()[1].ParameterType.GetMethod("Invoke") ?? throw new MissingMethodException("Octo callback");
-        context.Patch(method, GameMethods.Handler<Plugin>(nameof(Replace)));
+        context.Patch(method, GameMethods.Handler<StoryText>(nameof(Replace)));
     }
 
     public static bool Replace(string __0, object __1)

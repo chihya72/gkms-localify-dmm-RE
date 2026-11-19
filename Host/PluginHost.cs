@@ -23,8 +23,8 @@ public sealed class PluginHost : IDisposable
     // Lifecycle operations are called on the Unity thread.
     public void Start(string packages, string profileFile, string data)
     {
-        var profile = Catalog.ReadProfile(profileFile);
         var catalog = Catalog.Discover(packages, log);
+        var profile = Catalog.ReadProfile(profileFile, catalog);
         foreach (var id in profile.Enabled.Distinct(StringComparer.Ordinal))
         {
             if (running.Any(item => item.Scope.Id == id)) continue;
@@ -81,7 +81,7 @@ public sealed class PluginHost : IDisposable
         }
     }
 
-    private sealed class Scope : IPluginContext, IDisposable
+    private sealed class Scope : IPluginScope
     {
         private readonly IGameServices game;
         private readonly Action<string> log;
@@ -91,6 +91,12 @@ public sealed class PluginHost : IDisposable
         public JsonElement Settings { get; }
         public Scope(string id, string data, JsonElement settings, IGameServices game, Action<string> log) =>
             (Id, DataDirectory, Settings, this.game, this.log) = (id, Path.GetFullPath(data), settings, game, log);
+        public IPluginScope OpenScope()
+        {
+            var child = new Scope(Id, DataDirectory, Settings, game, log);
+            patches.Push(child);
+            return child;
+        }
         public Type? FindType(string assembly, string fullName) => game.FindType(assembly, fullName);
         public void Log(string message) => log($"{Id}: {message}");
         public void Patch(MethodInfo target, MethodInfo? prefix = null, MethodInfo? postfix = null, int priority = 400) =>

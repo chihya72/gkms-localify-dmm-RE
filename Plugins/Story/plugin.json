@@ -1,7 +1,0 @@
-{
-  "id": "story",
-  "name": "剧情脚本替换",
-  "apiVersion": 1,
-  "assembly": "Gkms.Story.dll",
-  "entryPoint": "Gkms.Plugins.Story.Plugin"
-}

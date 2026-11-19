@@ -8,11 +8,12 @@ namespace Il2CppInterop.Runtime
 
 namespace UnityEngine
 {
-    public class Object
+    public partial class Object
     {
         public string name { get; set; } = "";
-        public static implicit operator bool(Object? obj) => obj != null;
-        public static void Destroy(Object value) { }
+        public bool Destroyed { get; private set; }
+        public static implicit operator bool(Object? obj) => obj != null && !obj.Destroyed;
+        public static void Destroy(Object value) => value.Destroyed = true;
     }
     public class Font : Object { }
     public class AssetBundle : Object

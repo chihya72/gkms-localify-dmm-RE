@@ -16,13 +16,15 @@ public static class Catalog
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private static readonly Regex IdPattern = new("^[a-z][a-z0-9.-]*$", RegexOptions.CultureInvariant);
 
-    public static Profile ReadProfile(string file)
+    public static Profile ReadProfile(string file) => ReadProfile(file, null);
+
+    public static Profile ReadProfile(string file, IReadOnlyDictionary<string, Package>? catalog)
     {
         if (!File.Exists(file)) return Profile.Empty;
         var p = JsonSerializer.Deserialize<Profile>(File.ReadAllText(file), Json);
         if (p?.Enabled == null || p.Enabled.Any(id => id == null || !IdPattern.IsMatch(id)))
             throw new InvalidDataException("enabled 必须是插件 ID 数组。");
-        return p;
+        return TextPackageUpgrade.Convert(p, catalog);
     }
 
     public static IReadOnlyDictionary<string, Package> Discover(string directory, Action<string> log)
@@ -52,6 +54,9 @@ public static class Catalog
             packages.Remove(id);
             log($"{id}: 插件 ID 重复，已跳过所有同名包。");
         }
+        if (TextPackageUpgrade.IsInstalled(packages))
+            foreach (var old in packages.Values.Where(p => TextPackageUpgrade.IsFormer(p.Manifest)).ToArray())
+                packages.Remove(old.Manifest.Id);
         return packages;
     }
 }

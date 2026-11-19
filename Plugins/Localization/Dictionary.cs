@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.Text;
+namespace Gkms.Plugins.Localization;
 
 public sealed class TextDictionary
 {
@@ -35,6 +35,8 @@ public sealed class TextDictionary
             }
         }
     }
+
+    internal bool IsKnown(string value) => translated.Contains(value) || exact.ContainsKey(value);
 
     public string Translate(string value)
     {

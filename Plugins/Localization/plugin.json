@@ -1,0 +1,7 @@
+{
+  "id": "localization",
+  "name": "文本汉化（界面、剧情、字体与语音气泡）",
+  "apiVersion": 1,
+  "assembly": "Gkms.Localization.dll",
+  "entryPoint": "Gkms.Plugins.Localization.Plugin"
+}
