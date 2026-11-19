@@ -26,7 +26,6 @@ public sealed class VoiceSubtitles : ILocalifyPlugin
     {
         context = ctx;
         config = SubtitleConfig.Load(ConfigFile(Path.Combine(ctx.DataDirectory, "local-files")));
-        if (!config.Enabled) { ctx.Log("字幕资源设置为关闭。"); return; }
         bubble = new DialogueBubble(ctx, config);
         const string campus = "campus-submodule.Runtime", sound = "Campus.Common.Sound.CampusSoundPlayer";
         const string game = "Assembly-CSharp", home = "Campus.OutGame.";

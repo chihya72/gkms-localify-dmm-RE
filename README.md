@@ -1,33 +1,32 @@
 # Gakumas Localify RE
 
-学园偶像大师 DMM 版的模块化插件框架。玩家在 Windows 管理器中勾选功能，每个插件有独立的 DLL、清单和配置。共用一份更新包的剧情、界面、字体和语音气泡合在 `localization` 中，可以在插件参数里分别开关。已有汉化资源继续放在游戏目录的 `gakumas-local` 下。
+学园偶像大师 DMM 版的模块化插件框架。玩家在 Windows 管理器中勾选功能，每个插件有独立的 DLL、清单和配置。`localization` 是共用文本资源包的唯一汉化插件。它统一启停界面与通用文本、剧情、字体、主页语音气泡、主数据翻译和 Live 歌词。已有汉化资源继续放在游戏目录的 `gakumas-local` 下。
 
 ## 使用
 
 1. 运行环境为 Windows x64。游戏侧入口使用 **BepInEx 6 Unity IL2CPP x64**，本项目编译使用 `6.0.0-be.793`。独立管理器使用 **.NET 6 Windows Desktop Runtime x64**。[BepInEx 构建](https://builds.bepinex.dev/projects/bepinex_be) · [.NET 桌面运行时](https://dotnet.microsoft.com/download/dotnet/6.0)
 2. 从下文构建得到的 `out\Release` 中，将 `BepInEx` 和 `gakumas-local` 两个目录合并到已配置好 BepInEx 的游戏目录。旧汉化的 `version.dll` 与 RE 会处理相同的游戏方法。切换时先在游戏关闭的状态下备份并停用旧汉化入口，保留 `gakumas-local\local-files` 和 `gakumas-local\texture2d`。
-3. 打开 `gakumas-local\re\Gkms.Manager.exe`，勾选功能并保存。第一次使用时所有插件默认关闭。常用汉化可勾选 `localization`。需要主数据表里的名称和说明时再勾选 `master`。选择 `localization` 后可在“编辑参数”中分别勾选文本功能。取消“中文回退字体”即可保留游戏原字体。
+3. 打开 `gakumas-local\re\Gkms.Manager.exe`，勾选功能并保存。第一次使用时所有插件默认关闭。勾选一次「文本汉化」即可启用整套汉化，取消勾选即可全部停用。
 4. 选择在下一次游戏加载宿主时生效。BepInEx 日志会按插件 ID 记录加载结果。资源缺失、API 版本不兼容或启动失败的插件会给出单独的诊断。
 
 管理器也支持命令行。以下示例在部署后的 `gakumas-local\re` 目录中用 PowerShell 7 执行，各命令可单独使用。
 
 ```powershell
 .\Gkms.Manager.exe list
-.\Gkms.Manager.exe enable localization master
-.\Gkms.Manager.exe disable master
+.\Gkms.Manager.exe enable localization
+.\Gkms.Manager.exe disable localization
 .\Gkms.Manager.exe import-legacy
 ```
 
-`import-legacy` 会读取上一级的 `localizationConfig.json`，将已有的功能选择、帧率、画质、旋转方向、陀螺仪和骨骼参数写入新配置。日后可以在管理器中继续修改选择。用户安装的其他插件和自定义参数会保留。旧 DMM 配置中启用了 `loginAsIOS` 时，导入会开启充值保护。上一版 RE 的 `i18n`、`text`、`story`、`font`、`subtitles` 选择会自动合并到 `localization`，原先关闭的分项继续关闭。
+`import-legacy` 会读取上一级的 `localizationConfig.json`，将已有的功能选择、帧率、画质、旋转方向、陀螺仪和骨骼参数写入新配置。日后可以在管理器中继续修改选择。用户安装的其他插件和自定义参数会保留。旧 DMM 配置中启用了 `loginAsIOS` 时，导入会开启充值保护。升级 RE 时，原先启用了 `localization`、`master`、`lyrics` 或更早的任一文本插件，就会启用 `localization`。原先全部停用的用户仍保持停用。保存配置时会移除旧分项开关。
 
 ## 可选插件
 
 | 插件 ID | 功能及数据来源 |
 | --- | --- |
-| `localization` | 从同一份 `local-files` 资源包加载界面键值、通用文本、剧情和 TMP 回退字体，并在主页语音播放时显示原生对白气泡。切页、语音停止或播放结束时清理字幕。 |
-| `master` | 读取 `local-files\masterTrans`，按表名、复合主键和子项主键匹配反序列化后的主数据。 |
+| `localization` | 使用同一文本资源包翻译界面、通用文本、剧情和主数据，加载中文回退字体，随主页语音显示字幕气泡，并在进入 Live 时默认显示歌词。游戏内仍可手动收起歌词。 |
 | `textures` | 用 `texture2d` 下的 PNG 替换 CanvasRenderer 界面贴图，支持嵌套目录和 sactx 图集名称。 |
-| `capture` | 将观察到的界面键和通用原文写入 `dump-files\observed.jsonl`。查找漏翻时还可在 `localization` 参数中开启 `textTest`，在游戏文本前显示来源标记。 |
+| `capture` | 将观察到的界面键和通用原文写入 `dump-files\observed.jsonl`。查找漏翻时还可在 `profile.json` 中设置 `settings.localization.textTest` 为 `true`，在游戏文本前显示来源标记。 |
 | `texture-capture` | 将 CanvasRenderer 使用的贴图导出至 `dump-files\texture2d`，可独立于贴图替换启用。 |
 | `frame-rate` | 设置游戏及 Unity 的目标帧率，参数为 `fps`。 |
 | `graphics` | 设置渲染比例、缓冲区像素、质量、体积效果与反射、LOD 档位。 |
@@ -35,7 +34,6 @@
 | `camera` | F8 切换摄影机。`mode` 可选 `free`、`follow` 或 `first-person`。滚轮调整视野，镜头启用时关闭景深。自由模式用 WASD 移动、Q/E 升降、鼠标右键转动。跟随和第一人称支持角色序号 `actorIndex` 和位置偏移 `offset`。第一人称默认隐藏当前角色的脸和头发，离开时恢复，可用 `hideHead` 关闭。 |
 | `gyro` | 全景与摄影界面使用鼠标右键或小键盘 4/6、2/8 控制姿态，小键盘 5 归中。 |
 | `physics` | 设置角色骨骼的阻尼、刚度、弹力、摆幅、权重、手臂修正、缩放以及 X/Y/Z 轴双向限位。 |
-| `lyrics` | 首次显示 Live 歌词，之后可以使用游戏自己的开关。 |
 | `schedule-sp` | 在培育日程中保留 SP 课程标记。 |
 | `card-cut-in` | 卡牌未指定皮肤时，查询账号已持有的卡牌皮肤，选用演出等级最高的一款。保留手动指定的皮肤。 |
 | `auto-photo` | 配置 Live 自动摄影的三个张数档位，默认 10、20、30。 |
@@ -43,13 +41,12 @@
 | `settings-panel` | 在游戏内按 Ctrl+U 打开随附的 Windows 插件管理器，编辑选择和参数，下次进入游戏时生效。 |
 | `unity-log` | 将游戏的 Unity 日志消息转发至 BepInEx 日志。 |
 
-`gakumas-local\re\profile.json` 同时存储选择和插件参数。文本插件有五个分项，`interfaceText` 使用 `localization.json`，`genericText` 使用通用词典，`story` 使用 `resource`，`font` 使用 `gakumasassets`，`subtitles` 使用 `genericTrans\genericTrans\lyrics\home_voice_subtitles.json`。新启用时五项默认开启，缺少资源的分项会单独记录。以下配置使用游戏原字体，并把目标帧率设为 120。
+`gakumas-local\re\profile.json` 同时存储选择和插件参数。文本插件读取 `local-files` 下的界面词典、剧情文件、字体和 `masterTrans` 主数据表。Live 歌词译文和主页语音字幕随 `genericTrans` 同包更新。以下配置启用整套文本汉化，并把目标帧率设为 120。
 
 ```json
 {
   "enabled": ["localization", "frame-rate"],
   "settings": {
-    "localization": { "font": false },
     "frame-rate": { "fps": 120 }
   }
 }

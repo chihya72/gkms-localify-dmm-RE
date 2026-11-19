@@ -1,7 +1,0 @@
-{
-  "id": "lyrics",
-  "name": "Live 歌词显示",
-  "apiVersion": 1,
-  "assembly": "Gkms.Lyrics.dll",
-  "entryPoint": "Gkms.Plugins.Lyrics.Plugin"
-}

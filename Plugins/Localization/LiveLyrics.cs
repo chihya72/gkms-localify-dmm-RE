@@ -1,14 +1,14 @@
 using System.Runtime.CompilerServices;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.Lyrics;
+namespace Gkms.Plugins.Localization;
 
-public sealed class Plugin : ILocalifyPlugin
+internal sealed class LiveLyrics : ILocalifyPlugin
 {
     private static ConditionalWeakTable<object, object> initialized = new();
     public void Start(IPluginContext context) => context.Patch(
         context.Require("Assembly-CSharp", "Campus.Live.LiveScenePresenter", "SetLyricsActive", "System.Boolean"),
-        GameMethods.Handler<Plugin>(nameof(ShowInitially)));
+        GameMethods.Handler<LiveLyrics>(nameof(ShowInitially)));
     public static void ShowInitially(object __instance, ref bool __0)
     {
         if (initialized.TryGetValue(__instance, out _)) return;

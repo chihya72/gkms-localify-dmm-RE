@@ -4,7 +4,6 @@ namespace Gkms.Plugins.Localization;
 
 public sealed class SubtitleConfig
 {
-    public bool Enabled { get; init; }
     public bool ShowCueWhenMissing { get; init; }
     public float FontSize { get; init; }
     public float LeftOffset { get; init; }
@@ -21,7 +20,6 @@ public sealed class SubtitleConfig
         var max = Number("bubbleWidth", 520);
         var config = new SubtitleConfig
         {
-            Enabled = !root.TryGetProperty("enabled", out var enabled) || enabled.GetBoolean(),
             ShowCueWhenMissing = root.TryGetProperty("showCueWhenMissing", out var missing) && missing.GetBoolean(),
             FontSize = Number("fontSize", 32), LeftOffset = Number("leftOffset", 40), MaxWidth = max,
             MinWidth = Number("minBubbleWidth", Math.Min(424, max)),

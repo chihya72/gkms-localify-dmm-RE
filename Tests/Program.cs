@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Gkms.Host;
 using Gkms.Plugins.Localization;
-using Gkms.Plugins.Master;
 using HarmonyLib;
 
 var packages = args[0];
@@ -14,6 +13,7 @@ try
     Verify(work, packages);
     VerifyAssets(work, packages);
     VerifyVoice(work, packages);
+    VerifyTextBundle(work, packages);
     VerifyPurchase(work, packages);
     VerifyCameraPhysics(work, packages);
     VerifyDisplayOptions(work, packages);
@@ -82,7 +82,8 @@ static void Verify(string work, string packages)
     using var retry = new PluginHost(testGame, log.Add);
     retry.Start(packages, profile, work);
     tmp.SetText("花");
-    Check(retry.Active.SequenceEqual(new[]{"localization"}) && tmp.Value == "花" && testGame.Live == 1, "单个文本功能启动失败回滚");
+    i18n.SetValue("key", "original");
+    Check(retry.Active.SequenceEqual(new[]{"localization"}) && tmp.Value == "花" && i18n.Value == "蒼", "通用文本启动失败后保留界面翻译");
 }
 
 static void VerifyAssets(string work, string packages)
@@ -146,6 +147,53 @@ static void VerifyVoice(string work, string packages)
     Check(clone.Destroyed && !UnityEngine.Resources.Template.Destroyed, "退出主页销毁克隆");
     File.WriteAllText(file, """{"subtitles":{"sud_vo_test_home_2":"兼容旧表"}}""");
     Check(SubtitleConfig.Load(file).Lookup("sud_vo_test_home_2") == "兼容旧表", "旧字幕格式");
+}
+
+static void VerifyTextBundle(string work, string packages)
+{
+    var local = Path.Combine(work, "local-files");
+    var master = Directory.CreateDirectory(Path.Combine(local, "masterTrans")).FullName;
+    File.Copy(Path.Combine(local, "Card.json"), Path.Combine(master, "Card.json"));
+    var subtitleFile = VoiceSubtitles.ConfigFile(local);
+    File.WriteAllText(subtitleFile, """{"enabled":false,"subtitles":{"sud_vo_bundle_home_one":"主页汉化"}}""");
+    File.WriteAllText(Path.Combine(Path.GetDirectoryName(subtitleFile)!, "srt_live_bundle.json"), """{"歌の一節":"歌词译文"}""");
+    var profile = Path.Combine(work, "profile.json");
+    File.WriteAllText(profile, """{"enabled":["master"],"settings":{"localization":{"interfaceText":false,"genericText":false,"story":false,"font":false,"subtitles":false}}}""");
+    var game = new TestGame();
+    var log = new List<string>();
+    var live = new LivePresenter();
+    var ui = new Ui();
+    var tmp = new Tmp();
+    var octo = new Octo();
+    var card = new Card();
+    var view = new Campus.OutGame.HomePageGroupPresenter();
+    var voice = new Campus.Common.Sound.CampusSoundPlayer { Cue = "sud_vo_bundle_home_one" };
+    using (var host = new PluginHost(game, log.Add))
+    {
+        host.Start(packages, profile, work);
+        Check(host.Active.SequenceEqual(new[] { "localization" }), string.Join(Environment.NewLine, log));
+        ui.SetValue("key", "original"); tmp.SetText("歌の一節");
+        string? story = null;
+        octo.LoadFromCacheOrDownload("scene.txt", (text, _) => story = text, null);
+        card.InternalMergeFrom(); new TMPro.TextMeshProUGUI().Awake();
+        view.OnScreenVisitEnd(); voice.Play(); new Campus.Common.CampusQualityManager().Update();
+        live.SetLyricsActive(false);
+        Check(ui.Value == "蒼" && tmp.Value == "歌词译文" && story == "剧情" && card.Name == "译名" &&
+              TMPro.TMP_Settings.fallbackFontAssets.Count == 1 && live.Visible, "一个开关加载所有文本处理");
+        var clone = UnityEngine.Resources.LastClone;
+        var messageType = new Il2CppSystem.Type(typeof(Campus.ADV.MessageContainer));
+        Check(clone is { activeSelf: true, Destroyed: false } && ((Campus.ADV.MessageContainer)clone.GetComponent(messageType)!).Text == "主页汉化",
+              "旧资源的分项开关不能关闭气泡");
+        live.SetLyricsActive(false); Check(!live.Visible, "保留游戏原生歌词操作");
+    }
+    File.WriteAllText(profile, """{"enabled":[]}""");
+    using var disabled = new PluginHost(game, log.Add);
+    disabled.Start(packages, profile, work);
+    card = new Card(); card.InternalMergeFrom(); live = new LivePresenter(); live.SetLyricsActive(false);
+    ui.SetValue("key", "original"); tmp.SetText("歌の一節"); new TMPro.TextMeshProUGUI().Awake();
+    Check(disabled.Active.Count == 0 && game.Live == 0 && ui.Value == "original" && tmp.Value == "歌の一節" &&
+          card.Name == "" && !live.Visible && TMPro.TMP_Settings.fallbackFontAssets.Count == 0 &&
+          UnityEngine.Resources.LastClone!.Destroyed, "关闭一个插件后移除全部回调和资源");
 }
 
 static void VerifyCameraPhysics(string work, string packages)
@@ -245,24 +293,39 @@ static void VerifyManager(string work, string distribution)
         return process.ExitCode;
     }
     var pluginDir = Path.Combine(root, "plugins");
-    var former = Directory.CreateDirectory(Path.Combine(pluginDir, "obsolete-i18n")).FullName;
-    var manifest = new Manifest("i18n", "旧界面插件", 1, "Gkms.I18n.dll", "Gkms.Plugins.I18n.Plugin");
-    File.WriteAllText(Path.Combine(former, "plugin.json"), JsonSerializer.Serialize(manifest, Catalog.Json));
-    Check(!Catalog.Discover(pluginDir, _ => {}).ContainsKey("i18n"), "覆盖安装时隐藏已合并的旧包");
+    var onlyOld = new Dictionary<string, Package>();
+    foreach (var (id, assembly) in new[] { ("i18n", "I18n"), ("master", "Master"), ("lyrics", "Lyrics") })
+    {
+        var former = Directory.CreateDirectory(Path.Combine(pluginDir, "obsolete-" + id)).FullName;
+        var manifest = new Manifest(id, id, 1, $"Gkms.{assembly}.dll", $"Gkms.Plugins.{assembly}.Plugin");
+        File.WriteAllText(Path.Combine(former, "plugin.json"), JsonSerializer.Serialize(manifest, Catalog.Json));
+        onlyOld.Add(id, new(former, manifest));
+    }
+    var current = Catalog.Discover(pluginDir, _ => {});
+    Check(current.ContainsKey("localization") && !onlyOld.Keys.Any(current.ContainsKey), "覆盖安装时只显示一个文本汉化包");
     var fileName = Path.Combine(root, "profile.json");
-    File.WriteAllText(fileName, """{"enabled":["i18n","story"],"settings":{"camera":{"speed":5}}}""");
-    var onlyOld = new Dictionary<string, Package> { ["i18n"] = new(former, manifest) };
+    foreach (var id in new[] { "localization", "master", "lyrics", "font", "story", "subtitles", "i18n", "text" })
+    {
+        File.WriteAllText(fileName, JsonSerializer.Serialize(new { enabled = new[] { id } }));
+        Check(Catalog.ReadProfile(fileName, current).Enabled.SequenceEqual(new[] { "localization" }), $"从 {id} 迁移到总开关");
+    }
+    File.WriteAllText(fileName, """{"enabled":["i18n","story","localization","master","lyrics"],"settings":{"localization":{"story":false,"font":false,"textTest":true},"camera":{"speed":5}}}""");
     Check(Catalog.ReadProfile(fileName, onlyOld).Enabled.Contains("i18n"), "仅安装旧包时保留原选择");
     Check(Run("enable","purchase-guard","unknown") != 0 && Catalog.ReadProfile(fileName).Enabled.SequenceEqual(new[]{"localization"}), "批量选择应全部生效或保留原配置");
     Check(Run("enable","purchase-guard") == 0 && Run("disable","purchase-guard") == 0 && Run("list") == 0 &&
           Catalog.ReadProfile(fileName).Enabled.SequenceEqual(new[]{"localization"}) &&
-          !Catalog.ReadProfile(fileName).Settings!["localization"].GetProperty("font").GetBoolean(), "管理器保留合并前的选择");
+          Catalog.ReadProfile(fileName, current).Settings!["localization"].GetProperty("textTest").GetBoolean(), "管理器保留诊断设置");
+    using (var saved = JsonDocument.Parse(File.ReadAllText(fileName)))
+        Check(saved.RootElement.GetProperty("enabled").GetArrayLength() == 1 &&
+              saved.RootElement.GetProperty("settings").GetProperty("localization").EnumerateObject().Single().Name == "textTest",
+              "保存配置时合并重复项并移除分项开关");
+    Check(Run("disable", "localization") == 0 && Catalog.ReadProfile(fileName, current).Enabled.Length == 0, "总开关可一并关闭");
     File.WriteAllText(Path.Combine(data, "localizationConfig.json"),
         """{"enabled":true,"targetFrameRate":120,"replaceFont":false,"enableFreeCamera":true,"loginAsIOS":true}""");
     Check(Run("import-legacy") == 0, "旧版选项导入");
     var imported = Catalog.ReadProfile(fileName);
     Check(imported.Enabled.Contains("camera") && imported.Enabled.Contains("frame-rate") && imported.Enabled.Contains("purchase-guard") &&
-        !imported.Settings!["localization"].GetProperty("font").GetBoolean() &&
+        imported.Enabled.Contains("localization") && !imported.Settings!["localization"].TryGetProperty("font", out _) &&
         imported.Settings!["frame-rate"].GetProperty("fps").GetInt32() == 120 &&
         imported.Settings["camera"].GetProperty("speed").GetInt32() == 5, "旧版参数迁移");
 }
@@ -285,15 +348,20 @@ static void VerifyUpdate(string work)
         Add("gakumasassets","新版字体包");
         Add("genericTrans/genericTrans/lyrics/home_voice_subtitles.json","""{"subtitles":{"cue":"新版字幕"}}""");
         Add("genericTrans/new.json","""{"new":"新词条"}""");
+        Add("genericTrans/genericTrans/lyrics/srt_live_bundle.json", """{"歌詞":"新歌词"}""");
+        Add("masterTrans/Card.json", """{"rules":{"primaryKeys":["id"]},"data":[{"id":"p","name":"新表名"}]}""");
     }
     data.Position = 0;
     using var zip = new System.IO.Compression.ZipArchive(data);
     var count = Gkms.Resources.PackInstaller.Install(work, false, zip, null);
     var installed = Path.Combine(work,"local-files");
-    Check(count == 5 && File.ReadAllText(Path.Combine(installed,"resource","scene.txt")) == "新版剧情" &&
+    var card = new Card();
+    new MasterTable(Path.Combine(installed, "masterTrans", "Card.json")).Apply(card);
+    var dictionary = new TextDictionary(installed);
+    Check(count == 7 && card.Name == "新表名" && dictionary.Translate("歌詞") == "新歌词" && File.ReadAllText(Path.Combine(installed,"resource","scene.txt")) == "新版剧情" &&
           File.ReadAllText(Path.Combine(installed,"gakumasassets")) == "新版字体包" &&
           SubtitleConfig.Load(VoiceSubtitles.ConfigFile(installed)).Lookup("cue") == "新版字幕" &&
-          new TextDictionary(installed).Translate("new") == "新词条" &&
+          dictionary.Translate("new") == "新词条" &&
           File.ReadAllText(Path.Combine(work, "local-files", "localization.json")).Contains("更新") &&
           File.Exists(Path.Combine(work, "local-files", "generic.json")) &&
           File.Exists(Path.Combine(work, "re", "local-files.previous", "localization.json")), "资源更新保存自定义文件与上一版");
@@ -325,7 +393,19 @@ static void VerifyPack(string root)
     Console.WriteLine($"资源包通过，界面键 {i18n.Count}，通用词条 {dictionary.Count}，语音字幕 {voices.Lines.Count}，主数据表 {tables.Length}。");
 }
 
-public sealed class Card { public string Id => "p"; public int Rank => 1; public string Name { get; set; } = ""; public List<Part> Parts { get; } = new(){new(PartKind.First),new(PartKind.Second)}; }
+public sealed class LivePresenter
+{
+    public bool Visible;
+    [MethodImpl(MethodImplOptions.NoInlining)] public void SetLyricsActive(bool visible) => Visible = visible;
+}
+public sealed class Card
+{
+    public string Id => "p";
+    public int Rank => 1;
+    public string Name { get; set; } = "";
+    public List<Part> Parts { get; } = new(){new(PartKind.First), new(PartKind.Second)};
+    [MethodImpl(MethodImplOptions.NoInlining)] public void InternalMergeFrom() { }
+}
 public enum PartKind { First, Second }
 public sealed record Part(PartKind Kind) { public string Text { get; set; } = ""; }
 public sealed class Ui
@@ -351,6 +431,7 @@ public sealed class TestGame : IGameServices
     private int textPatches;
     public Type? FindType(string assembly, string fullName) => fullName switch
         { "Qua.UI.I18n" => typeof(Ui), "TMPro.TMP_Text" => typeof(Tmp), "Octo.Loader.OctoResourceLoader" => typeof(Octo),
+          "Campus.Live.LiveScenePresenter" => typeof(LivePresenter), "Campus.Common.Proto.Client.Master.Card" => typeof(Card),
           _ => typeof(TestGame).Assembly.GetType(fullName) };
     public IDisposable Patch(string owner, MethodInfo method, MethodInfo? prefix, MethodInfo? postfix, int priority)
     {

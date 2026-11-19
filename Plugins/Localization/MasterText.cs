@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Gkms.Sdk;
 
-namespace Gkms.Plugins.Master;
+namespace Gkms.Plugins.Localization;
 
-public sealed class Plugin : ILocalifyPlugin
+internal sealed class MasterText : ILocalifyPlugin
 {
     private static readonly ConcurrentDictionary<Type, MasterTable> tables = new();
     private static readonly ConcurrentDictionary<Type, byte> reported = new();
@@ -23,7 +23,7 @@ public sealed class Plugin : ILocalifyPlugin
             try
             {
                 var table = new MasterTable(file);
-                context.Patch(target, postfix: GameMethods.Handler<Plugin>(nameof(Translate)));
+                context.Patch(target, postfix: GameMethods.Handler<MasterText>(nameof(Translate)));
                 tables[type] = table;
             }
             catch (Exception e) { context.Log($"{Path.GetFileName(file)}: {e.GetBaseException().Message}"); }

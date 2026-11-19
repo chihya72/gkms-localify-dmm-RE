@@ -14,18 +14,17 @@ internal static class LegacyProfile
         var enabled = Flag("enabled", true);
         var flags = new Dictionary<string, bool>
         {
-            ["localization"] = true, ["master"] = Flag("useMasterTrans", true),
+            ["localization"] = true,
             ["textures"] = Flag("replaceTexture", true), ["frame-rate"] = Number("targetFrameRate") > 0,
             ["schedule-sp"] = Flag("dbgMode"), ["card-cut-in"] = Flag("dbgMode"),
             ["purchase-guard"] = Flag("loginAsIOS"), ["settings-panel"] = true,
             ["graphics"] = Flag("useCustomeGraphicSettings"), ["window"] = Number("gameOrientation") != 0 || Flag("dmmUnlockSize"),
             ["camera"] = Flag("enableFreeCamera"), ["gyro"] = Flag("enableGyroEmu"), ["physics"] = Flag("enableBreastParam"),
             ["capture"] = Flag("dumpText"), ["texture-capture"] = Flag("dumpRuntimeTexture"),
-            ["unity-log"] = Flag("dbgMode"), ["auto-photo"] = Flag("dbgMode"), ["lyrics"] = Flag("dbgMode") && Flag("unlockAllLive")
+            ["unity-log"] = Flag("dbgMode"), ["auto-photo"] = Flag("dbgMode")
         };
         var settings = new Dictionary<string, JsonObject>();
-        settings["localization"] = new JsonObject { ["interfaceText"] = true, ["genericText"] = true, ["story"] = true,
-            ["font"] = Flag("replaceFont", true), ["subtitles"] = true, ["textTest"] = Flag("textTest") };
+        settings["localization"] = new JsonObject { ["textTest"] = Flag("textTest") };
         void Map(string id, params (string Old, string New)[] pairs)
         {
             var result = new JsonObject();

@@ -36,7 +36,7 @@ internal sealed class PluginPicker : Form
             Text = errors.Count == 0 ? "勾选需要的插件。保存后，下次进入游戏时生效。" : string.Join(Environment.NewLine, errors) };
         var edit = new Button { Text = "编辑参数", AutoSize = true, Enabled = false };
         plugins.SelectedIndexChanged += (_, _) => edit.Enabled = plugins.SelectedItems.Count == 1 &&
-            catalog.ContainsKey((string)plugins.SelectedItems[0].Tag);
+            (string)plugins.SelectedItems[0].Tag != "localization" && catalog.ContainsKey((string)plugins.SelectedItems[0].Tag);
         edit.Click += (_, _) =>
         {
             if (plugins.SelectedItems.Count != 1) return;

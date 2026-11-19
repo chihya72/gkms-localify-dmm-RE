@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 
-namespace Gkms.Plugins.Master;
+namespace Gkms.Plugins.Localization;
 
 public sealed class MasterTable
 {

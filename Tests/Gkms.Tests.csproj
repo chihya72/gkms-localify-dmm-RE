@@ -5,7 +5,6 @@
     <ProjectReference Include="..\Tools\Resources\Gkms.Resources.csproj" />
     <ProjectReference Include="..\Plugins\Localization\Gkms.Localization.csproj" />
     <ProjectReference Include="..\Plugins\PurchaseGuard\Gkms.PurchaseGuard.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Master\Gkms.Master.csproj" />
     <ProjectReference Include="..\Plugins\ScheduleSp\Gkms.ScheduleSp.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Plugins\CardCutIn\Gkms.CardCutIn.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Plugins\Camera\Gkms.Camera.csproj" ReferenceOutputAssembly="false" />
