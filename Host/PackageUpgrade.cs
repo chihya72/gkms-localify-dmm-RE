@@ -8,14 +8,14 @@ internal static class PackageUpgrade
     private static readonly Dictionary<string, string> Former = new(StringComparer.Ordinal)
     {
         ["i18n"] = "Gkms.I18n.dll", ["text"] = "Gkms.Text.dll", ["story"] = "Gkms.Story.dll",
-        ["font"] = "Gkms.Font.dll", ["subtitles"] = "Gkms.Subtitles.dll", ["master"] = "Gkms.Master.dll",
+        ["subtitles"] = "Gkms.Subtitles.dll", ["master"] = "Gkms.Master.dll",
         ["lyrics"] = "Gkms.Lyrics.dll"
     };
     private static readonly string[] FormerSwitches = { "interfaceText", "genericText", "story", "font", "subtitles", "master", "lyrics" };
 
     private static readonly Dictionary<string, string> BuiltIns = new(StringComparer.Ordinal)
     {
-        ["settings-panel"] = "Gkms.SettingsPanel.dll", ["unity-log"] = "Gkms.UnityLog.dll"
+        ["settings-panel"] = "Gkms.SettingsPanel.dll", ["unity-log"] = "Gkms.UnityLog.dll", ["font"] = "Gkms.Font.dll"
     };
 
     private static bool HasPackage(IReadOnlyDictionary<string, Package>? catalog, string id, string assembly) =>
@@ -23,6 +23,7 @@ internal static class PackageUpgrade
 
     public static bool IsRetired(Manifest manifest, IReadOnlyDictionary<string, Package> catalog) =>
         BuiltIns.TryGetValue(manifest.Id, out var builtin) && manifest.Assembly == builtin ||
+        manifest.Id == "purchase-guard" && manifest.Assembly == "Gkms.PurchaseGuard.dll" && HasPackage(catalog, "ios-login", "Gkms.PurchaseGuard.dll") ||
         manifest.Id == "texture-capture" && manifest.Assembly == "Gkms.TextureCapture.dll" && HasPackage(catalog, "capture", "Gkms.Capture.dll") ||
         Former.TryGetValue(manifest.Id, out var oldText) && manifest.Assembly == oldText && HasPackage(catalog, "localization", "Gkms.Localization.dll");
 
@@ -33,6 +34,8 @@ internal static class PackageUpgrade
         string? Migrate(string id)
         {
             if (catalog?.ContainsKey(id) == true) return id;
+            if (id == "purchase-guard" && HasPackage(catalog, "ios-login", "Gkms.PurchaseGuard.dll")) return "ios-login";
+            if (id is "unlock-live" or "unlock-costumes" && HasPackage(catalog, "live-unlock", "Gkms.LiveUnlock.dll")) return "live-unlock";
             if (BuiltIns.ContainsKey(id)) return null;
             if (hasCapture && id == "texture-capture") return "capture";
             return hasText && Former.ContainsKey(id) ? "localization" : id;

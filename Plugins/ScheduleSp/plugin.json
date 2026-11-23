@@ -1,7 +1,0 @@
-{
-  "id": "schedule-sp",
-  "name": "培育日程 SP 标记",
-  "apiVersion": 1,
-  "assembly": "Gkms.ScheduleSp.dll",
-  "entryPoint": "Gkms.Plugins.ScheduleSp.Plugin"
-}

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Host\Gkms.Host.csproj" />
+    <Compile Include="..\Manager\*.cs" Exclude="..\Manager\Program.cs" Link="Manager\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="StageBridge" AfterTargets="Build">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)Build-Native.ps1&quot; -Configuration $(Configuration)" />
+    <ItemGroup>
+      <BridgeFile Include="$(TargetPath);$(TargetDir)Gkms.Runtime.deps.json;$(TargetDir)Gkms.Runtime.runtimeconfig.json;$(TargetDir)Gkms.Host.dll;$(TargetDir)Gkms.Sdk.dll" />
+      <BridgeFile Include="@(ReferencePath)" Condition="'%(Filename)' == 'ImGui.NET'" />
+      <NativeImGui Include="$(TargetDir)runtimes\win-x64\native\cimgui.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BridgeFile)" DestinationFolder="$(StageRoot)\gakumas-local\re" />
+    <Copy SourceFiles="@(NativeImGui)" DestinationFolder="$(StageRoot)\gakumas-local\re\runtimes\win-x64\native" />
+    <Copy SourceFiles="$(TargetDir)version.dll" DestinationFolder="$(StageRoot)" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)MinHook.LICENSE.txt" DestinationFolder="$(StageRoot)\gakumas-local\re" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\LICENSE;$(MSBuildThisFileDirectory)..\README.md;$(MSBuildThisFileDirectory)..\PLUGIN_DEVELOPMENT.md;$(MSBuildThisFileDirectory)..\AUDIT.md" DestinationFolder="$(StageRoot)\gakumas-local\re" />
+    <Delete Files="$(StageRoot)\BepInEx\plugins\GkmsLocalify\Gkms.BepInEx.dll;$(StageRoot)\BepInEx\plugins\GkmsLocalify\Gkms.Host.dll;$(StageRoot)\BepInEx\plugins\GkmsLocalify\Gkms.Sdk.dll;$(StageRoot)\BepInEx\plugins\GkmsLocalify\ImGui.NET.dll" />
+  </Target>
+</Project>

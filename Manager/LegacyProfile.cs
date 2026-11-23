@@ -17,7 +17,8 @@ internal static class LegacyProfile
             ["localization"] = true,
             ["textures"] = Flag("replaceTexture", true), ["frame-rate"] = Number("targetFrameRate") > 0,
             ["schedule-sp"] = Flag("dbgMode"), ["card-cut-in"] = Flag("dbgMode"),
-            ["purchase-guard"] = Flag("loginAsIOS"),
+            ["ios-login"] = Flag("loginAsIOS"),
+            ["live-unlock"] = Flag("dbgMode") && (Flag("unlockAllLive") || Flag("unlockAllLiveCostume")),
             ["graphics"] = Flag("useCustomeGraphicSettings"), ["window"] = Number("gameOrientation") != 0 || Flag("dmmUnlockSize"),
             ["camera"] = Flag("enableFreeCamera"), ["gyro"] = Flag("enableGyroEmu"), ["physics"] = Flag("enableBreastParam"),
             ["capture"] = Flag("dumpText") || Flag("dumpRuntimeTexture"),
@@ -25,6 +26,11 @@ internal static class LegacyProfile
         };
         var settings = new Dictionary<string, JsonObject>();
         settings["localization"] = new JsonObject { ["textTest"] = Flag("textTest") };
+        if (config["useAPIAssets"] != null) settings["localization"]["autoCheckUpdates"] = Flag("useAPIAssets");
+        settings["textures"] = new JsonObject();
+        settings["live-unlock"] = new JsonObject { ["live"] = Flag("unlockAllLive"), ["costumes"] = Flag("unlockAllLiveCostume") };
+        settings["capture"] = new JsonObject { ["text"] = Flag("dumpText"), ["textures"] = Flag("dumpRuntimeTexture") };
+        if (config["useAPITextureAssets"] != null) settings["textures"]["autoCheckUpdates"] = Flag("useAPITextureAssets");
         void Map(string id, params (string Old, string New)[] pairs)
         {
             var result = new JsonObject();

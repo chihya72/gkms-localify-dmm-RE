@@ -1,7 +1,0 @@
-{
-  "id": "camera",
-  "name": "自由摄影机",
-  "apiVersion": 1,
-  "assembly": "Gkms.Camera.dll",
-  "entryPoint": "Gkms.Plugins.Camera.Plugin"
-}

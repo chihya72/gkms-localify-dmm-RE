@@ -1,0 +1,16 @@
+{
+  "id": "example.greeting",
+  "name": "问候示例",
+  "author": "Example developer",
+  "version": "1.0.0",
+  "description": "只引用 SDK 的最小插件，展示类型化配置和主线程调度。",
+  "apiVersion": 2,
+  "assembly": "Gkms.ExamplePlugin.dll",
+  "entryPoint": "Example.Greeting.Plugin",
+  "settingsUi": "Example.Greeting.SettingsUi",
+  "canReloadResources": true,
+  "settings": [
+    { "key": "message", "label": "问候内容", "type": "string", "default": "Hello, Localify!" },
+    { "key": "logOnStart", "label": "加载时写入日志", "type": "boolean", "default": true }
+  ]
+}

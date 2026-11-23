@@ -4,8 +4,9 @@ namespace UnityEngine
 {
     public partial class Object
     {
-        public static Object[] FindObjectsOfType(Il2CppSystem.Type type, bool includeInactive) =>
-            Resources.LevelButton is { } level && type.Managed.IsInstanceOfType(level) ? new Object[] { level } : Array.Empty<Object>();
+        public static Object[] SceneObjects = Array.Empty<Object>();
+        public static Object[] FindObjectsOfType(System.Type type, bool includeInactive) =>
+            Resources.LevelButton is { } level && type.IsInstanceOfType(level) ? new Object[] { level } : SceneObjects.Where(type.IsInstanceOfType).ToArray();
         public static Object Instantiate(Object source, Transform parent, bool worldSpace)
         {
             if (source != Resources.Template) throw new Exception("应只克隆气泡。");
@@ -41,11 +42,11 @@ namespace UnityEngine
         public GameObject() => transform.gameObject = this;
         public void SetActive(bool value) => activeSelf = value;
         public void Add(object value) => components[value.GetType()] = value;
-        public object? GetComponentInChildren(Il2CppSystem.Type type, bool includeInactive) => GetComponent(type);
-        public object? GetComponent(Il2CppSystem.Type type) => components.GetValueOrDefault(type.Managed);
-        public object AddComponent(Il2CppSystem.Type type)
+        public object? GetComponentInChildren(System.Type type, bool includeInactive) => GetComponent(type);
+        public object? GetComponent(System.Type type) => components.GetValueOrDefault(type);
+        public object AddComponent(System.Type type)
         {
-            var value = Activator.CreateInstance(type.Managed)!; Add(value); return value;
+            var value = Activator.CreateInstance(type)!; Add(value); return value;
         }
     }
     public class CanvasGroup : Object { public bool interactable { get; set; } public bool blocksRaycasts { get; set; } public float alpha { get; set; } }
@@ -66,7 +67,7 @@ namespace UnityEngine
         public static GameObject Template { get; } = new();
         public static GameObject? LastClone;
         public static Campus.Common.ProduceLevelButtonView? LevelButton;
-        public static Object Load(string path, Il2CppSystem.Type type)
+        public static Object Load(string path, System.Type type)
         {
             if (path != "verticaladv") throw new Exception(path);
             Template.Add(new Campus.ADV.MessageContainer(Template));
@@ -113,19 +114,34 @@ namespace Campus.Common
     public class VerticalAdvPresenter { public Engine _enginePrefab { get; } = new(); }
     public class CampusQualityManager
     {
+        public readonly List<string> Trace = new();
+        private float rate = 30;
+        public float TargetFrameRate
+        {
+            [MethodImpl(MethodImplOptions.NoInlining)] get => rate;
+            [MethodImpl(MethodImplOptions.NoInlining)] set { Trace.Add("fps"); rate = value; UnityEngine.Application.targetFrameRate = (int)value; }
+        }
+        public (int Level, int Pixels, float Scale, int Volume) Settings;
+        public QualityLevel Reflection, Lod;
+        public QualityLevel ReflectionQuality => Reflection;
+        public QualityLevel LODQuality => Lod;
+        [MethodImpl(MethodImplOptions.NoInlining)] public void SetReflectionQuality(QualityLevel value) { Trace.Add("reflection"); Reflection = value; }
+        [MethodImpl(MethodImplOptions.NoInlining)] public void SetLODQuality(QualityLevel value) { Trace.Add("lod"); Lod = value; }
         [MethodImpl(MethodImplOptions.NoInlining)] public void Update() { }
-        [MethodImpl(MethodImplOptions.NoInlining)] public void ApplySetting(int level, int pixels, float scale, int volume) { }
+        [MethodImpl(MethodImplOptions.NoInlining)] public void ApplySetting(int level, int pixels, float scale, int volume) { Trace.Add("apply"); Settings = (level, pixels, scale, volume); }
     }
+    public enum QualityLevel { Lowest = 0, Low = 10, Middle = 20, High = 30, Higher = 40, Highest = 100 }
     public class CampusSoundManager { [MethodImpl(MethodImplOptions.NoInlining)] public void OnSoundPlayed(string cue) { } }
 }
 namespace Campus.Common.Sound
 {
-    public class CampusSoundPlayer
+    public class CampusSoundPlayer : UnityEngine.Object
     {
         public string Cue = "";
         private bool ended;
         public bool IsEndOrStop() => ended;
-        [MethodImpl(MethodImplOptions.NoInlining)] public void Play() { ended = false; new CampusSoundManager().OnSoundPlayed(Cue); }
+        public bool FailPlay;
+        [MethodImpl(MethodImplOptions.NoInlining)] public void Play() { if (FailPlay) throw new InvalidOperationException("play failure"); ended = false; new CampusSoundManager().OnSoundPlayed(Cue); }
         [MethodImpl(MethodImplOptions.NoInlining)] public void PlayWith(object actor, bool lipSync) => Play();
         [MethodImpl(MethodImplOptions.NoInlining)] public void Stop() => ended = true;
         [MethodImpl(MethodImplOptions.NoInlining)] public void ResetState() => ended = true;
@@ -175,7 +191,7 @@ namespace Campus.OutGame
     public class Home3DManager { [MethodImpl(MethodImplOptions.NoInlining)] public void SetFreeLookEnable(bool value) { } }
     public class HomeActorBase
     {
-        public object Actor { get; } = new();
+        public object Actor { get; } = new UnityEngine.Object();
         [MethodImpl(MethodImplOptions.NoInlining)] public virtual void OnLoadEnd() { }
     }
     public class HomeTopActor : HomeActorBase { [MethodImpl(MethodImplOptions.NoInlining)] public override void OnLoadEnd() { } }

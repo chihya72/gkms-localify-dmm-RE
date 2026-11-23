@@ -1,7 +1,0 @@
-{
-  "id": "physics",
-  "name": "角色骨骼物理参数",
-  "apiVersion": 1,
-  "assembly": "Gkms.Physics.dll",
-  "entryPoint": "Gkms.Plugins.Physics.Plugin"
-}

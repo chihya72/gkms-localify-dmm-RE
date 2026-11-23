@@ -1,9 +1,0 @@
-<Project>
-  <ItemGroup>
-    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Sdk\Gkms.Sdk.csproj" />
-  </ItemGroup>
-  <Target Name="StagePlugin" AfterTargets="Build">
-    <Copy SourceFiles="$(TargetPath);$(MSBuildProjectDirectory)\plugin.json"
-          DestinationFolder="$(MSBuildThisFileDirectory)..\out\$(Configuration)\gakumas-local\re\plugins\$(MSBuildProjectName)" />
-  </Target>
-</Project>

@@ -1,5 +1,15 @@
 using System.Runtime.CompilerServices;
 
+namespace Campus.Common.Proto.Client.Master
+{
+    public sealed class LateMaster : Google.Protobuf.IMessage
+    {
+        public string Id { get; set; } = "late";
+        public string Name { get; set; } = "后来下载资源的主表原文";
+        public void InternalMergeFrom() { }
+    }
+}
+
 namespace Campus.Common.Proto.Client.Enums
 {
     public enum ProduceStepType { Normal, Sp }
@@ -20,12 +30,14 @@ namespace Campus.Common.Master
     public record Skin(string Id, string ProduceCardId, int CutInType);
     public sealed class ProduceCardSkinMaster
     {
-        public List<Skin> GetAllWithSortByKey(int sort) => new()
+        public List<Skin> Items = new()
         {
             new("small", "card", 1), new("grand", "card", 3), new("irrelevant", "other", 3)
         };
+        public int Reads;
+        public List<Skin> GetAllWithSortByKey(int sort) { Reads++; return Items; }
     }
-    public static class MasterManager { public static ProduceCardSkinMaster ProduceCardSkinMaster { get; } = new(); }
+    public static partial class MasterManager { public static ProduceCardSkinMaster ProduceCardSkinMaster { get; } = new(); }
 }
 
 namespace Campus.Common.User
@@ -35,8 +47,8 @@ namespace Campus.Common.User
         public HashSet<string> Items { get; } = new();
         public bool IsOwned(string id) => Items.Contains(id);
     }
-    public class UserDataManagerBase<T> { public static UserProduceCardSkinCollection UserProduceCardSkinList { get; } = new(); }
-    public class UserDataManager : UserDataManagerBase<UserDataManager> { }
+    public partial class UserDataManagerBase<T> { public static UserProduceCardSkinCollection UserProduceCardSkinList { get; } = new(); }
+    public partial class UserDataManager : UserDataManagerBase<UserDataManager> { }
 }
 
 namespace Campus.InGame.Card

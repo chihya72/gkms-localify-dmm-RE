@@ -1,18 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\Bridge\Gkms.Runtime.csproj" /></ItemGroup>
+  <PropertyGroup><OutputType>Exe</OutputType><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="ExamplePlugin.cs;ExampleSettingsUi.cs;ContractProbe.cs" />
+    <Compile Include="..\Manager\ProfileEditor.cs" />
+    <Compile Include="..\Manager\PluginInstallation.cs" />
+    <Compile Include="..\Manager\PluginRepositories.cs;..\Manager\PluginUpgrade.cs;..\Manager\PluginRepositoryService.cs" />
+    <Compile Include="..\Manager\ImGuiAppearance.cs" />
+    <Compile Include="..\Manager\ResourceUpdatePanel.cs;..\Manager\ImGuiFilePicker.cs;..\Manager\UiText.cs" />
+    <ProjectReference Include="Gkms.ExamplePlugin.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Host\Gkms.Host.csproj" />
-    <ProjectReference Include="..\Plugins\Capture\Gkms.Capture.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Localization\Gkms.Localization.csproj" />
-    <ProjectReference Include="..\Plugins\PurchaseGuard\Gkms.PurchaseGuard.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\ScheduleSp\Gkms.ScheduleSp.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\CardCutIn\Gkms.CardCutIn.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Camera\Gkms.Camera.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Physics\Gkms.Physics.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Graphics\Gkms.Graphics.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Plugins\Textures\Gkms.Textures.csproj" ReferenceOutputAssembly="false" />
-
-    <ProjectReference Include="..\Plugins\FrameRate\Gkms.FrameRate.csproj" ReferenceOutputAssembly="false" />
+    <Reference Include="Gkms.Localization"><HintPath>$(OfficialPluginOutput)\gakumas-local\re\plugins\Gkms.Localization\Gkms.Localization.dll</HintPath></Reference>
+    <Reference Include="Gkms.LiveUnlock"><HintPath>$(OfficialPluginOutput)\gakumas-local\re\plugins\Gkms.LiveUnlock\Gkms.LiveUnlock.dll</HintPath></Reference>
+    <Reference Include="Gkms.Camera"><HintPath>$(OfficialPluginOutput)\gakumas-local\re\plugins\Gkms.Camera\Gkms.Camera.dll</HintPath></Reference>
     <PackageReference Include="HarmonyX" Version="2.10.2" />
+    <PackageReference Include="Veldrid.ImGui" Version="5.89.2-ga121087cad" />
   </ItemGroup>
 </Project>

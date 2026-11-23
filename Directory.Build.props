@@ -5,5 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <StageRoot Condition="'$(StageRoot)' == ''">$(MSBuildThisFileDirectory)out\Framework\$(Configuration)</StageRoot>
+    <BaseIntermediateOutputPath Condition="'$(MSBuildProjectName)' == 'Gkms.ExamplePlugin'">obj\example\</BaseIntermediateOutputPath>
   </PropertyGroup>
 </Project>

@@ -1,13 +1,21 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Gkms.Host;
+using Gkms.Sdk;
 
 namespace Gkms.Manager;
 
 internal static class ProfileEditor
 {
     public static void Apply(string root, IReadOnlyDictionary<string, Package> catalog, IReadOnlyDictionary<string, bool> changes,
-        IReadOnlyDictionary<string, JsonObject>? importedSettings = null, KeyValuePair<string, JsonObject>? replace = null)
+        IReadOnlyDictionary<string, JsonObject>? importedSettings = null, KeyValuePair<string, JsonObject>? replace = null, bool merge = false)
+    {
+        using var packageLock = PluginInstallation.AcquireLock(root);
+        ApplyLocked(root, catalog, changes, importedSettings, replace, merge);
+    }
+
+    internal static void ApplyLocked(string root, IReadOnlyDictionary<string, Package> catalog, IReadOnlyDictionary<string, bool> changes,
+        IReadOnlyDictionary<string, JsonObject>? importedSettings = null, KeyValuePair<string, JsonObject>? replace = null, bool merge = false)
     {
         using var editLock = new FileStream(Path.Combine(root, "profile.edit"), FileMode.OpenOrCreate,
             FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose);
@@ -17,7 +25,8 @@ internal static class ProfileEditor
         foreach (var (id, selected) in changes)
         {
             if (!selected) { enabled.Remove(id); continue; }
-            if (!catalog.TryGetValue(id, out var p) || p.Manifest.ApiVersion != Catalog.ApiVersion)
+            if (!catalog.TryGetValue(id, out var p) || !Catalog.Supports(p.Manifest.ApiVersion) ||
+                !File.Exists(Path.Combine(p.Directory, "plugin.json")))
                 throw new InvalidDataException($"找不到兼容插件 {id}");
             if (!enabled.Contains(id)) enabled.Add(id);
         }
@@ -34,7 +43,21 @@ internal static class ProfileEditor
             }
         }
         if (replace is { } edit)
-            (profile["settings"] ??= new JsonObject()).AsObject()[edit.Key] = edit.Value;
+        {
+            var options = (profile["settings"] ??= new JsonObject()).AsObject();
+            if (!merge) options[edit.Key] = edit.Value;
+            else
+            {
+                var existing = (options[edit.Key] ??= new JsonObject()).AsObject();
+                foreach (var pair in edit.Value) existing[pair.Key] = pair.Value == null ? null : JsonNode.Parse(pair.Value.ToJsonString());
+            }
+        }
+        var edited = changes.Where(p => p.Value).Select(p => p.Key)
+            .Concat(importedSettings?.Keys ?? Enumerable.Empty<string>())
+            .Concat(replace is { } changed ? new[] { changed.Key } : Array.Empty<string>()).Distinct();
+        foreach (var id in edited)
+            if (catalog.TryGetValue(id, out var package) && profile["settings"]?[id] is { } value)
+                PluginSettings.Validate(package.Manifest.Settings, JsonSerializer.SerializeToElement(value));
         var temp = file + ".tmp";
         try
         {

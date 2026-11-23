@@ -1,7 +1,0 @@
-{
-  "id": "auto-photo",
-  "name": "Live 自动摄影张数",
-  "apiVersion": 1,
-  "assembly": "Gkms.AutoPhoto.dll",
-  "entryPoint": "Gkms.Plugins.AutoPhoto.Plugin"
-}

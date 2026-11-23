@@ -1,7 +1,0 @@
-{
-  "id": "purchase-guard",
-  "name": "充值保护",
-  "apiVersion": 1,
-  "assembly": "Gkms.PurchaseGuard.dll",
-  "entryPoint": "Gkms.Plugins.PurchaseGuard.Plugin"
-}

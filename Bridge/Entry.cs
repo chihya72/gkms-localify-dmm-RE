@@ -1,63 +1,79 @@
 using System.Reflection;
-using BepInEx;
-using BepInEx.Unity.IL2CPP;
-using HarmonyLib;
+using System.Runtime.InteropServices;
 using Gkms.Host;
 
 namespace Gkms.Bridge;
 
-[BepInPlugin("gkms.localify.re", "Gakumas Localify RE", "0.1.0")]
-[BepInProcess("gakumas.exe")]
-public sealed class Entry : BasePlugin, IGameServices
+public sealed class Entry : IGameServices,IAdvancedGameServices
 {
-    private PluginHost? host;
-
-    public override void Load()
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Startup { public nint GameAssembly,Create,Enable,Disable,GameDirectory; }
+    private static Entry? current;
+    private static readonly object logLock=new();
+    private readonly NativeRuntime runtime;
+    private readonly NativeHooks hooks;
+    private readonly PluginHost host;
+    private readonly GameOverlay? overlay;
+    private readonly string logFile;
+    private Entry(Startup startup)
     {
-        var data = Path.Combine(Paths.GameRootPath, "gakumas-local");
-        var root = Path.Combine(data, "re");
-        host = new PluginHost(this, message => Log.LogInfo(message));
-        host.Start(Path.Combine(root, "plugins"), Path.Combine(root, "profile.json"), data);
-    }
-
-    public override bool Unload()
-    {
-        host?.Dispose();
-        host = null;
-        return true;
-    }
-
-    public Type? FindType(string assembly, string fullName)
-    {
-        Assembly interop;
-        try { interop = Assembly.Load(new AssemblyName(assembly)); }
-        catch (FileNotFoundException) { return null; }
-        // Il2CppInterop can prefix assemblies/types that overlap .NET namespaces.
-        return interop.GetType(fullName) ?? interop.GetType("Il2Cpp" + fullName);
-    }
-
-    public IDisposable Patch(string owner, MethodInfo target, MethodInfo? prefix, MethodInfo? postfix, int priority)
-    {
-        var harmony = new Harmony("gkms.localify.re." + owner);
+        var game=Marshal.PtrToStringUni(startup.GameDirectory) ?? throw new InvalidDataException("Missing game directory.");
+        var data=Path.Combine(game,"gakumas-local");
+        var root=Path.Combine(data,"re");
+        logFile=Path.Combine(root,"runtime.log");
+        runtime=new NativeRuntime(startup.GameAssembly);
+        hooks=new NativeHooks(Marshal.GetDelegateForFunctionPointer<NativeHooks.CreateHook>(startup.Create),
+            Marshal.GetDelegateForFunctionPointer<NativeHooks.ToggleHook>(startup.Enable),Marshal.GetDelegateForFunctionPointer<NativeHooks.ToggleHook>(startup.Disable),Log);
+        host=new PluginHost(this,Log);
+        Log("Gakumas Localify RE: native DMM loader, live IL2CPP API and MinHook.");
+        Log("framework: 原生反射元数据缓存已启用；对象属性值仍实时读取。");
         try
         {
-            harmony.Patch(target, prefix == null ? null : new HarmonyMethod(prefix) { priority = priority },
-                postfix == null ? null : new HarmonyMethod(postfix) { priority = priority });
-            return new Registration(harmony, target, prefix, postfix);
+            Gkms.Manager.PluginInstallation.Cleanup(root, Log, beforeHostStart: true);
+            host.Start(Path.Combine(root,"plugins"),Path.Combine(root,"profile.json"),data);
+            host.EnableRuntimeControl();
         }
-        catch
+        catch(Exception error) { Log(error.ToString()); host.Dispose(); throw; }
+        try
         {
-            new Registration(harmony, target, prefix, postfix).Dispose();
-            throw;
+            // Resolve the same cimgui core used by plugin settings, with a single
+            // in-game context. No Windows Forms or external GUI process is loaded.
+            var imgui=NativeLibrary.Load(Path.Combine(root,"runtimes","win-x64","native","cimgui.dll"));
+            NativeLibrary.SetDllImportResolver(typeof(ImGuiNET.ImGui).Assembly,(name,_,_)=>name is "cimgui" or "cimgui.dll"?imgui:IntPtr.Zero);
+            overlay=new GameOverlay(root,Path.Combine(game,"version.dll"),Log);
+            RuntimeClient.OpenPanel=()=>overlay.SetVisible(true);
         }
+        catch(Exception error) { Log("Game overlay unavailable: "+error); }
+        Log("Runtime started.");
     }
-
-    private sealed record Registration(Harmony Harmony, MethodInfo Target, MethodInfo? Prefix, MethodInfo? Postfix) : IDisposable
+    [UnmanagedCallersOnly]
+    public static int Initialize(nint arguments,int length)
     {
-        public void Dispose()
+        try
         {
-            if (Prefix != null) Harmony.Unpatch(Target, Prefix);
-            if (Postfix != null) Harmony.Unpatch(Target, Postfix);
+            if(length!=Marshal.SizeOf<Startup>() || arguments==0) return -1;
+            if(current!=null) return 0;
+            current=new Entry(Marshal.PtrToStructure<Startup>(arguments));
+            return 0;
+        }
+        catch(Exception error)
+        {
+            System.Diagnostics.Trace.WriteLine(error);
+            try
+            {
+                var startup=Marshal.PtrToStructure<Startup>(arguments);
+                var root=Marshal.PtrToStringUni(startup.GameDirectory)!;
+                File.AppendAllText(Path.Combine(root,"gakumas-local","re","runtime.log"),error+Environment.NewLine);
+            }
+            catch { /* Never let a logging failure cross the unmanaged entry boundary. */ }
+            return -2;
         }
     }
+    private void Log(string message)
+    {
+        lock(logLock) File.AppendAllText(logFile,$"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}");
+    }
+    public Type? FindType(string assembly,string fullName)=>runtime.FindType(assembly,fullName);
+    public IDisposable Patch(string owner,MethodInfo target,MethodInfo? prefix,MethodInfo? postfix,int priority)=>hooks.Patch(owner,target,prefix,postfix,null,priority);
+    public IDisposable PatchAdvanced(string owner,MethodBase target,MethodInfo? prefix,MethodInfo? postfix,MethodInfo? finalizer,int priority)=>hooks.Patch(owner,target,prefix,postfix,finalizer,priority);
 }

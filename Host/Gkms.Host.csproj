@@ -1,3 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup><ProjectReference Include="..\Sdk\Gkms.Sdk.csproj" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="BuiltinFont.bundle" LogicalName="Gkms.Host.BuiltinFont.bundle" /></ItemGroup>
 </Project>
