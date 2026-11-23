@@ -119,7 +119,7 @@ internal sealed class BuiltinFont : ILocalifyPlugin, IPluginDiagnostics
         }
         catch (Exception error) { Warn("内置字体替换失败: " + error.GetBaseException().Message); }
     }
-    private void Warn(string message) { if (warnings.Add(message)) context.Log(message); }
+    private void Warn(string message) { if (warnings.Add(message)) context.Log(PluginLogLevel.Warning, message); }
 
     public void Dispose()
     {

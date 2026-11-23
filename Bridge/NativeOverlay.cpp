@@ -4,6 +4,8 @@
 #define NOMINMAX
 #include <windows.h>
 #include <windowsx.h>
+#include <imm.h>
+#pragma comment(lib, "imm32.lib")
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
@@ -47,19 +49,39 @@ ComPtr<ID3D11ShaderResourceView> font;
 int vertexCapacity{},indexCapacity{},generation{};
 LARGE_INTEGER frequency{},lastFrame{};
 RECT oldClip{}; bool hadClip{};
+const UINT imeStateMessage=RegisterWindowMessageW(L"GkmsLocalifyRE.OverlayImeState");
+HIMC previousIme{}; bool imeAttached{};
+// Association and restoration must run on the window's own message thread.
+void UpdateIme(HWND window,bool active) {
+    if(active==imeAttached) return;
+    if(active) {
+        previousIme=ImmGetContext(window);
+        if(previousIme) ImmReleaseContext(window,previousIme);
+        // ImmAssociateContextEx can synchronously re-enter WindowProc.
+        imeAttached=true;
+        ImmAssociateContextEx(window,nullptr,IACE_DEFAULT);
+    } else {
+        auto current=ImmGetContext(window);
+        if(current) { ImmNotifyIME(current,NI_COMPOSITIONSTR,CPS_CANCEL,0); ImmReleaseContext(window,current); }
+        ImmAssociateContext(window,previousIme); previousIme=nullptr; imeAttached=false;
+    }
+}
 void SetVisible(bool value) {
     std::lock_guard<std::mutex> lock(inputMutex);
     if(visible.exchange(value)==value) return;
     if(value) { hadClip=GetClipCursor(&oldClip)!=0; ClipCursor(nullptr); }
     else if(hadClip && gameWindow && GetForegroundWindow()==gameWindow) { ClipCursor(&oldClip); hadClip=false; }
     inputs.clear(); inputs.push_back({static_cast<UINT>(value?WM_SETFOCUS:WM_KILLFOCUS),0,0});
+    if(gameWindow) PostMessageW(gameWindow,imeStateMessage,0,0);
 }
 bool InputMessage(UINT message) {
     return (message>=WM_MOUSEFIRST && message<=WM_MOUSELAST) || (message>=WM_KEYFIRST && message<=WM_KEYLAST) || message==WM_INPUT;
 }
 LRESULT CALLBACK WindowProc(HWND window,UINT message,WPARAM wparam,LPARAM lparam) {
+    if(message==imeStateMessage) { UpdateIme(window,visible.load()); return 0; }
     if(message==WM_KEYDOWN && wparam=='U' && !(lparam&(1LL<<30)) && (GetKeyState(VK_CONTROL)&0x8000)) {
         SetVisible(!visible.load());
+        UpdateIme(window,visible.load());
         if(visible && previousProc) {
             CallWindowProcW(previousProc,window,WM_KEYUP,VK_CONTROL,0);
             CallWindowProcW(previousProc,window,WM_KEYUP,'U',0);
@@ -68,6 +90,17 @@ LRESULT CALLBACK WindowProc(HWND window,UINT message,WPARAM wparam,LPARAM lparam
     }
     if(message==WM_KILLFOCUS || message==WM_SETFOCUS) { std::lock_guard<std::mutex> lock(inputMutex); inputs.push_back({message,wparam,lparam}); }
     if(visible) {
+        UpdateIme(window,true);
+        // Unity may suppress IME composition when no game text box has focus.
+        // Let the OS process composition/candidates; enqueue committed text once.
+        if(message==WM_IME_CHAR) {
+            std::lock_guard<std::mutex> lock(inputMutex);
+            if(inputs.size()<4096) inputs.push_back({WM_CHAR,wparam,lparam});
+            return 0;
+        }
+        if((message>=WM_IME_STARTCOMPOSITION && message<=WM_IME_COMPOSITION) ||
+           (message>=WM_IME_SETCONTEXT && message<=WM_IME_KEYUP) || message==WM_INPUTLANGCHANGE)
+            return DefWindowProcW(window,message,wparam,lparam);
         if(InputMessage(message) && message!=WM_INPUT) {
             std::lock_guard<std::mutex> lock(inputMutex);
             if(inputs.size()<4096) inputs.push_back({message,wparam,lparam});
@@ -80,6 +113,10 @@ LRESULT CALLBACK WindowProc(HWND window,UINT message,WPARAM wparam,LPARAM lparam
 }
 void BindWindow(HWND window) {
     if(gameWindow==window) return;
+    if(gameWindow && IsWindow(gameWindow)) {
+        // A window replacement is rare; restore before detaching its procedure.
+        auto wasVisible=visible.exchange(false); SendMessageW(gameWindow,imeStateMessage,0,0); visible=wasVisible;
+    }
     if(gameWindow && IsWindow(gameWindow) && reinterpret_cast<WNDPROC>(GetWindowLongPtrW(gameWindow,GWLP_WNDPROC))==WindowProc)
         SetWindowLongPtrW(gameWindow,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(previousProc.load()));
     gameWindow=window;
@@ -253,6 +290,7 @@ OVERLAY_API int GkmsOverlayRender(const OverlayDraw* draw) {
 }
 OVERLAY_API void GkmsOverlayStop() {
     std::lock_guard<std::recursive_mutex> lock(renderMutex); frameCallback=nullptr; SetVisible(false);
+    if(gameWindow && IsWindow(gameWindow)) SendMessageW(gameWindow,imeStateMessage,0,0);
     if(gameWindow && IsWindow(gameWindow) && reinterpret_cast<WNDPROC>(GetWindowLongPtrW(gameWindow,GWLP_WNDPROC))==WindowProc)
         SetWindowLongPtrW(gameWindow,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(previousProc.load()));
     gameWindow=nullptr; ResetDevice();

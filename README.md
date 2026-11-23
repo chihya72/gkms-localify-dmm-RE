@@ -10,6 +10,8 @@
 2. 关闭游戏，解压 Release 中的 `Gkms-RE-*-win-x64.zip`，将 `version.dll` 和 `gakumas-local` 放到 `gakumas.exe` 同级目录。升级时保留已有配置和插件资源；旧 BepInEx 入口 `winhttp.dll` 需先停用。
 3. 自行启动游戏，按 **Ctrl+U**，在「插件库」安装需要的插件，再到「已安装」启用。插件默认停用，标注「需要重启」的更改在下次启动生效。
 
+从旧版升级时，可在游戏关闭后删除 `gakumas-local\re` 下遗留的 `Gkms.Manager.exe`、`Gkms.Manager.dll`、`Gkms.Manager.deps.json` 和 `Gkms.Manager.runtimeconfig.json`；插件管理统一在游戏内完成。
+
 文本和贴图资源在对应插件的「资源更新」中下载。框架内置字体、面板和日志，无需另外安装插件。
 
 ## 官方订阅源

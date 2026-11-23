@@ -102,7 +102,7 @@ public sealed class NativeHooks
             if(registration.Site.Count==0 && !incompatibleSites.ContainsKey(registration.Method.Code))
             {
                 var result=disable(registration.Method.Code);
-                if(result!=0) log($"MinHook disable {registration.Method.Name}: {result}");
+                if(result!=0) log($"[Error] MinHook disable {registration.Method.Name}: {result}");
             }
             // Keep delegates and original trampolines alive for in-flight calls. Disabling restores game code;
             // retaining inert sites also allows re-enabling while another plugin callback is still returning.
@@ -197,7 +197,7 @@ public sealed class NativeHooks
             catch(Exception error)
             {
                 // CLR exceptions must never escape a reverse P/Invoke callback into the game.
-                try { log($"Native callback boundary {method.Name}: {error}"); } catch { }
+                try { log($"[Error] Native callback boundary {method.Name}: {error}"); } catch { }
                 return abiResult==typeof(void)?null:Activator.CreateInstance(abiResult);
             }
         }
@@ -276,7 +276,7 @@ public sealed class NativeHooks
             }
             if(error!=null)
             {
-                log($"Native hook {method.Owner.FullName}.{method.Name}: {error}");
+                log($"[Error] Native hook {method.Owner.FullName}.{method.Name}: {error}");
             }
             for(int i=0;i<parameters.Length;i++) if(parameters[i].IsByRef) runtime.Write((nint)raw[i+offset]!,parameters[i].GetElementType()!,args[i],memory);
             if(offset!=0 && method.Owner.IsValueType && instance is NativeObject boxed)

@@ -41,7 +41,7 @@ internal sealed class ResourceUpdatePanel : IDisposable
         if(release!=null) {ImGui.Separator(); ImGui.TextUnformatted($"{release.InstalledVersion??"—"} → {release.Version??"ZIP"}"); Gkms.Sdk.PluginUiText.Wrapped(release.Description??"");}
         picker.Draw();
     }
-    private void Report(string message) => log($"{package.Manifest.Id}: {message}");
+    private void Report(string message) => log(PluginLog.WithSource(message,package.Manifest.Id));
     private void Run(string phase,Func<CancellationToken,Task<Action>> work)
     {
         if(busy) return; busy=true; progress=0; status=phase; Report(phase); stop=new(); var token=stop.Token;
@@ -49,7 +49,7 @@ internal sealed class ResourceUpdatePanel : IDisposable
         {
             try {var result=await work(token); completed.Enqueue(result);}
             catch(OperationCanceledException) {Report("资源操作已取消。"); completed.Enqueue(()=>status=UiText.T("资源操作已取消。","資源操作已取消。","Resource operation canceled.","リソース操作をキャンセルしました。"));}
-            catch(Exception e) {Report("资源操作失败: "+e); completed.Enqueue(()=>status=UiText.Error+": "+e.GetBaseException().Message);}
+            catch(Exception e) {Report("[Error] 资源操作失败: "+e); completed.Enqueue(()=>status=UiText.Error+": "+e.GetBaseException().Message);}
             finally {completed.Enqueue(()=>{busy=false; stop?.Dispose(); stop=null;});}
         });
     }

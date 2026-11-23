@@ -65,7 +65,7 @@ public sealed class SettingsUiSession : IDisposable
         try { if (plugin is SchemaSettingsUi schema) schema.DrawResourceSettings(); return true; }
         catch (Exception error) { Fail(error); return false; }
     }
-    private void Fail(Exception error) { Fault = error.GetBaseException().Message; context.Log("设置界面已停止: " + Fault); }
+    private void Fail(Exception error) { Fault = error.GetBaseException().Message; context.Log("[Error] 设置界面已停止: " + Fault); }
 
     public void Dispose()
     {
@@ -73,7 +73,7 @@ public sealed class SettingsUiSession : IDisposable
         if (disposed) return;
         disposed = true;
         context.Stop();
-        try { plugin?.Dispose(); } catch (Exception error) { context.Log("设置界面卸载: " + error.Message); }
+        try { plugin?.Dispose(); } catch (Exception error) { context.Log("[Error] 设置界面卸载: " + error.Message); }
         plugin = null;
         loader?.Unload(); loader = null;
     }
@@ -144,15 +144,15 @@ public sealed class SettingsUiSession : IDisposable
             return reload(Stopping);
         }
         public T Own<T>(T resource) where T : IDisposable { CheckActive(); ArgumentNullException.ThrowIfNull(resource); owned.Add(resource); return resource; }
-        public void Log(string message) => log(Id + ": " + message);
+        public void Log(string message) => log(PluginLog.WithSource(message, Id));
         public void Stop()
         {
             CheckThread(); stopped = true;
             draw = open = null;
-            try { stop.Cancel(); } catch (Exception error) { Log("取消设置工作: " + error.GetBaseException().Message); }
+            try { stop.Cancel(); } catch (Exception error) { Log("[Error] 取消设置工作: " + error.GetBaseException().Message); }
             pending.Clear();
             foreach (var resource in owned.AsEnumerable().Reverse())
-                try { resource.Dispose(); } catch (Exception error) { Log("释放设置资源: " + error.Message); }
+                try { resource.Dispose(); } catch (Exception error) { Log("[Error] 释放设置资源: " + error.Message); }
             owned.Clear(); stop.Dispose();
         }
     }

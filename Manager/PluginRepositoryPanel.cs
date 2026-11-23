@@ -7,6 +7,20 @@ namespace Gkms.Manager;
 
 internal sealed class PluginRepositoryPanel : IDisposable
 {
+    private static readonly PluginSource LocalSource = new("##local", "本地插件", "");
+    internal static PluginOffer[] LocalOffers(IReadOnlyDictionary<string, Package> installed, RepositorySettings settings) =>
+        installed.Values.Where(p => !settings.Origins.ContainsKey(p.Manifest.Id)).Select(p =>
+        {
+            var m = p.Manifest;
+            return new PluginOffer(LocalSource, new RepositoryPlugin(m.Id, m.Name, m.Version ?? "", m.ApiVersion,
+                m.Author ?? "", m.Description ?? "", "")
+            {
+                Names = m.Names, Punchline = m.Punchline, Category = m.Category, Tags = m.Tags,
+                RepositoryUrl = m.RepositoryUrl, RequiresRestart = m.RequiresRestart,
+                HasSettingsUi = m.HasSettingsUi, HasResourceUpdater = m.ResourceUpdater != null
+            });
+        }).ToArray();
+    private static string SourceLabel(PluginSource source) => source == LocalSource ? "本地" : source.Official ? "官方" : "第三方";
     private readonly string root;
     private readonly PluginRepositoryService service;
     private readonly Action beforeChange, changed;
@@ -52,7 +66,7 @@ internal sealed class PluginRepositoryPanel : IDisposable
             { completed.Enqueue(() => message = "已取消；已完成的安装和更新予以保留。"); }
             catch (Exception error)
             {
-                log(error.ToString());
+                log("[Error] "+error);
                 completed.Enqueue(() => message = error.Message + (error.InnerException == null ? "" : "\n" + error.GetBaseException().Message));
             }
             finally
@@ -89,28 +103,29 @@ internal sealed class PluginRepositoryPanel : IDisposable
         ImGui.BeginDisabled(!updates.Any(o => Catalog.Supports(o.Plugin.ApiVersion)));
         if (ImGui.Button($"更新全部 ({updates.Length})")) { pendingOffers = updates; pendingUpdate = true; confirm = true; }
         ImGui.EndDisabled();
+        ImGui.EndDisabled();
         ImGui.SetNextItemWidth(-1);
         ImGui.InputTextWithHint("##repository-search", "搜索名称、作者、说明或标签", ref search, 256);
         ImGui.SetNextItemWidth(125); ImGui.Combo("##repository-filter", ref filter, new[] { "全部插件", "未安装", "已安装", "可更新" }, 4);
         ImGui.SameLine(); ImGui.SetNextItemWidth(-1);
-        var sources = PluginRepositoryStore.Sources(settings);
+        var sources = PluginRepositoryStore.Sources(settings).Append(LocalSource).ToArray();
         if (ImGui.BeginCombo("##repository-source", sources.FirstOrDefault(s => s.Id == sourceFilter)?.Name ?? "全部来源"))
         {
             if (ImGui.Selectable("全部来源", sourceFilter.Length == 0)) sourceFilter = "";
             foreach (var source in sources) if (ImGui.Selectable(source.Name + "##" + source.Id, sourceFilter == source.Id)) sourceFilter = source.Id;
             ImGui.EndCombo();
         }
+        var offers = results.SelectMany(r => r.Plugins).Concat(LocalOffers(installed, settings)).ToArray();
         ImGui.SetNextItemWidth(-1);
         if (ImGui.BeginCombo("##repository-category", categoryFilter.Length == 0 ? "全部分类" : categoryFilter))
         {
             if (ImGui.Selectable("全部分类", categoryFilter.Length == 0)) categoryFilter = "";
-            foreach (var category in results.SelectMany(r => r.Plugins).Select(o => o.Plugin.Category)
+            foreach (var category in offers.Select(o => o.Plugin.Category)
                 .Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().OrderBy(c => c, StringComparer.Ordinal))
                 if (ImGui.Selectable(category!, categoryFilter == category)) categoryFilter = category!;
             ImGui.EndCombo();
         }
-        ImGui.EndDisabled();
-        var rows = results.SelectMany(r => r.Plugins).Where(o =>
+        var rows = offers.Where(o =>
             (sourceFilter.Length == 0 || sourceFilter == o.Source.Id) &&
             (categoryFilter.Length == 0 || categoryFilter == o.Plugin.Category) && o.Plugin.Matches(search) &&
             (filter == 0 || filter == 1 && !installed.ContainsKey(o.Plugin.Id) || filter == 2 && installed.ContainsKey(o.Plugin.Id) ||
@@ -126,7 +141,7 @@ internal sealed class PluginRepositoryPanel : IDisposable
             if (ImGui.Selectable("##" + key, selection == key, ImGuiSelectableFlags.None, new Vector2(0, lineHeight * 2 + lineGap))) selection = key;
             var draw = ImGui.GetWindowDrawList();
             draw.AddText(position, ImGui.GetColorU32(ImGuiCol.Text), offer.Plugin.DisplayName(UiText.Language));
-            var metadata = (offer.Source.Official ? "官方" : "第三方") + " · " + offer.Plugin.Version + " · ";
+            var metadata = SourceLabel(offer.Source) + " · " + offer.Plugin.Version + " · ";
             var secondLine = position + new Vector2(0, lineHeight + lineGap);
             draw.AddText(secondLine, ImGui.GetColorU32(ImGuiCol.TextDisabled), metadata);
             var isInstalled = installed.ContainsKey(offer.Plugin.Id);
@@ -154,10 +169,10 @@ internal sealed class PluginRepositoryPanel : IDisposable
         if (!string.IsNullOrWhiteSpace(plugin.Punchline)) Gkms.Sdk.PluginUiText.Wrapped(plugin.Punchline);
         if (!string.IsNullOrWhiteSpace(plugin.Category)) Gkms.Sdk.PluginUiText.Wrapped("分类: " + plugin.Category);
         if (plugin.Tags.Length > 0) Gkms.Sdk.PluginUiText.Wrapped("标签: " + string.Join(" · ", plugin.Tags));
-        Gkms.Sdk.PluginUiText.Wrapped("来源: " + (offer.Source.Official ? "官方 · " : "第三方 · ") + offer.Source.Name);
-        Gkms.Sdk.PluginUiText.Wrapped(offer.Source.Bundled ? "从独立官方插件仓库安装的离线目录；也可配置官方在线索引。" : offer.Source.Url);
+        Gkms.Sdk.PluginUiText.Wrapped("来源: " + SourceLabel(offer.Source) + " · " + offer.Source.Name);
+        Gkms.Sdk.PluginUiText.Wrapped(offer.Source == LocalSource ? "通过本地安装包安装，尚未关联订阅源。" : offer.Source.Bundled ? "从独立官方插件仓库安装的离线目录；也可配置官方在线索引。" : offer.Source.Url);
         installed.TryGetValue(plugin.Id, out var current);
-        ImGui.TextUnformatted($"已安装: {current?.Manifest.Version ?? "—"}    来源版本: {plugin.Version}");
+        Gkms.Sdk.PluginUiText.Wrapped(offer.Source == LocalSource ? $"已安装: {plugin.Version}" : $"已安装: {current?.Manifest.Version ?? "—"}    来源版本: {plugin.Version}");
         ImGui.TextUnformatted($"插件 API: {plugin.ApiVersion}    宿主 API: {Catalog.ApiVersion}");
         if (plugin.RequiresRestart) Gkms.Sdk.PluginUiText.Wrapped("此插件的启停需要重新启动游戏；更新前请关闭游戏，通过管理器命令行更新。");
         if (plugin.HasResourceUpdater) Gkms.Sdk.PluginUiText.Wrapped("提供独立资源更新；安装插件后在其资源更新页下载资源。");
@@ -180,7 +195,9 @@ internal sealed class PluginRepositoryPanel : IDisposable
         }
         else
         {
-            if (PluginRepositoryStore.Owns(settings, plugin.Id, offer.Source))
+            if (offer.Source == LocalSource)
+                Gkms.Sdk.PluginUiText.Wrapped("在「已安装」页启用或配置此插件。如需自动更新，可在对应订阅源的同名插件详情中关联来源。");
+            else if (PluginRepositoryStore.Owns(settings, plugin.Id, offer.Source))
             {
                 var newer = PluginVersion.Parse(plugin.Version).CompareTo(PluginVersion.Parse(current.Manifest.Version!)) > 0;
                 ImGui.BeginDisabled(!compatible || !newer);
@@ -281,15 +298,18 @@ internal sealed class PluginRepositoryPanel : IDisposable
         const string title = "确认插件操作###repository-operation";
         if (confirm) { confirm = false; ImGui.OpenPopup(title); }
         var open = true;
-        ImGui.SetNextWindowSizeConstraints(new Vector2(300, 160), ImGui.GetIO().DisplaySize - new Vector2(24));
-        if (ImGui.BeginPopupModal(title, ref open, ImGuiWindowFlags.AlwaysAutoResize))
+        ImGuiAppearance.PrepareModal();
+        if (ImGui.BeginPopupModal(title, ref open, ImGuiWindowFlags.AlwaysAutoResize|ImGuiWindowFlags.NoSavedSettings|ImGuiWindowFlags.NoMove))
         {
-            if (pendingUninstall != null) Gkms.Sdk.PluginUiText.Wrapped("卸载 " + pendingUninstall + "，保留插件配置、资源和采集输出。");
+            ImGuiAppearance.PlaceModal();
+            if (pendingUninstall != null) Gkms.Sdk.PluginUiText.Wrapped("将停用并卸载 " + pendingUninstall + "。该插件的配置和数据（含资源文件）会保留，重新安装后可继续使用。");
             else if (pendingOffers != null)
             {
                 Gkms.Sdk.PluginUiText.Wrapped(pendingUpdate ? "更新以下插件，保留配置、资源和原来的启用状态：" : "安装以下插件，安装后默认停用：");
+                ImGui.BeginChild("operation-plugins",new Vector2(0,Math.Min(220*ImGui.GetFontSize()/18,ImGui.GetIO().DisplaySize.Y*.3f)));
                 foreach (var offer in pendingOffers)
                     Gkms.Sdk.PluginUiText.Wrapped($"{offer.Plugin.DisplayName(UiText.Language)}  {installed.GetValueOrDefault(offer.Plugin.Id)?.Manifest.Version ?? "未安装"} → {offer.Plugin.Version}\n{(offer.Source.Official ? "官方" : "第三方")} · {offer.Source.Name}");
+                ImGui.EndChild();
             }
             if (ImGui.Button("确认"))
             {

@@ -4,8 +4,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Sdk", "Sdk\Gkms.Sdk.cs
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Host", "Host\Gkms.Host.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000002}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Manager", "Manager\Gkms.Manager.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000003}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.Runtime", "Bridge\Gkms.Runtime.csproj", "{BDFB3E88-3164-49F0-AB5A-000000000004}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gkms.ExamplePlugin", "Tests\Gkms.ExamplePlugin.csproj", "{BDFB3E88-3164-49F0-AB5A-00000000001E}"
@@ -28,10 +26,6 @@ Global
 		{BDFB3E88-3164-49F0-AB5A-000000000002}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000002}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000002}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000003}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000003}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BDFB3E88-3164-49F0-AB5A-000000000003}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000004}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDFB3E88-3164-49F0-AB5A-000000000004}.Release|Any CPU.ActiveCfg = Release|Any CPU

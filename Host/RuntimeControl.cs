@@ -78,7 +78,7 @@ internal sealed class RuntimeControl : IDisposable
         if (stamp == self.lastWrite) return;
         self.lastWrite = stamp;
         try { self.host.ReloadProfile(); self.log("framework: 配置已处理。" + self.host.DescribeStatus()); }
-        catch (Exception error) { self.log("framework: " + error.GetBaseException().Message); }
+        catch (Exception error) { self.log("[Error] framework: " + error.GetBaseException().Message); }
     }
     private async Task ListenAsync()
     {
@@ -117,7 +117,7 @@ internal sealed class RuntimeControl : IDisposable
                 await writer.WriteLineAsync(JsonSerializer.Serialize(reply, Wire)).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { return; }
-            catch (Exception error) { log("framework: " + error.GetBaseException().Message); }
+            catch (Exception error) { log("[Error] framework: " + error.GetBaseException().Message); }
         }
     }
     public void Dispose()
@@ -133,6 +133,6 @@ internal sealed class RuntimeControl : IDisposable
                 if (doc.RootElement.GetProperty("processId").GetInt32() == Environment.ProcessId) File.Delete(marker);
             }
         }
-        catch (Exception error) { log(error.Message); }
+        catch (Exception error) { log("[Error] "+error.Message); }
     }
 }

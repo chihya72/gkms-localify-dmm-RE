@@ -8,10 +8,12 @@ namespace Gkms.Manager;
 
 internal sealed class OverlayPanel : IDisposable
 {
+    private static readonly string WindowTitle=$"Gakumas Localify RE v{typeof(OverlayPanel).Assembly.GetName().Version?.ToString(3)}###manager";
     private readonly string root,packagesPath;
     private readonly Action<string> log;
     private readonly ConcurrentQueue<Action> completed=new();
     private readonly ImGuiFilePicker picker=new();
+    private readonly OutputLogPanel outputLog;
     private readonly PluginRepositoryPanel repositories;
     private readonly object lifetime=new();
     private IReadOnlyDictionary<string,Package> catalog=new Dictionary<string,Package>();
@@ -34,7 +36,7 @@ internal sealed class OverlayPanel : IDisposable
     private DateTime nextProfilePoll;
     public OverlayPanel(string root,Action<string> log,string? packagesPath=null)
     {
-        this.root=root; this.log=log; this.packagesPath=packagesPath??Path.Combine(root,"plugins"); UiText.Load(root); Refresh();
+        this.root=root; this.log=log; this.packagesPath=packagesPath??Path.Combine(root,"plugins"); outputLog=new(root); UiText.Load(root); Refresh();
         repositories=new(root,CloseSettings,Refresh,log);
     }
     public string Status { get=>status; set=>status=value; }
@@ -58,7 +60,7 @@ internal sealed class OverlayPanel : IDisposable
         operation=Task.Run(async()=>
         {
             try {var next=await work(); completed.Enqueue(next);}
-            catch(Exception e) {log(e.ToString()); completed.Enqueue(()=>status=e.GetBaseException().Message);}
+            catch(Exception e) {log("[Error] "+e); completed.Enqueue(()=>status=e.GetBaseException().Message);}
             finally {completed.Enqueue(()=>busy=false);}
         });
     }
@@ -82,7 +84,7 @@ internal sealed class OverlayPanel : IDisposable
         {
             RuntimeReply? reply=null;
             try { reply=await RuntimeClient.SendAsync(root,"status"); }
-            catch(Exception error) { log("读取插件状态失败: "+error.GetBaseException().Message); }
+            catch(Exception error) { log("[Error] 读取插件状态失败: "+error.GetBaseException().Message); }
             var result=reply;
             completed.Enqueue(()=>{pollingStatus=false; if(!busy && revision==runtimeRevision) ApplyReply(result,false);});
         });
@@ -117,8 +119,9 @@ internal sealed class OverlayPanel : IDisposable
         ImGui.SetNextWindowSize(new Vector2(Math.Min(1100,io.DisplaySize.X-24),Math.Min(760,io.DisplaySize.Y-24)),ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowPos(io.DisplaySize*.5f,ImGuiCond.FirstUseEver,new Vector2(.5f));
         bool open=true;
-        if(!ImGui.Begin("Gakumas Localify RE###manager",ref open,ImGuiWindowFlags.NoSavedSettings)) {ImGui.End(); return open;}
+        if(!ImGui.Begin(WindowTitle,ref open,ImGuiWindowFlags.NoSavedSettings)) {ImGui.End(); return open;}
         ImGui.SetWindowPos(ImGuiAppearance.VisiblePosition(ImGui.GetWindowPos(), ImGui.GetWindowSize(), io.DisplaySize));
+        ImGuiAppearance.ModalCenter=ImGui.GetWindowPos()+ImGui.GetWindowSize()*.5f;
         ImGui.TextDisabled("Ctrl+U  ·  Dear ImGui"); ImGui.SameLine();
         ImGui.SetNextItemWidth(90); var language=Array.IndexOf(UiText.Languages,UiText.Language);
         if(ImGui.Combo("##language",ref language,UiText.Languages,UiText.Languages.Length)) {CloseSettings(); UiText.Select(UiText.Languages[language]);}
@@ -134,13 +137,13 @@ internal sealed class OverlayPanel : IDisposable
             ImGui.EndTabBar();
         }
         ImGui.End();
-        DrawConfirmations(); picker.Draw(); return open;
+        DrawConfirmations(); picker.Draw(); outputLog.Draw(); return open;
     }
     private void DrawInstalled()
     {
         ImGui.BeginDisabled(repositories.Changing);
         ImGui.BeginDisabled(busy);
-        if(ImGui.Button(UiText.T("安装插件","安裝插件","Install plugin","プラグイン追加"))) picker.Open("Plugin ZIP",path=>Run(async()=>
+        if(ImGui.Button(UiText.T("安装插件","安裝插件","Install plugin","プラグイン追加"))) picker.Open(UiText.T("选择本地插件 ZIP 安装包","選擇本機插件 ZIP 安裝包","Choose a local plugin ZIP package","ローカルプラグイン ZIP を選択"),path=>Run(async()=>
         {
             var package=await Task.Run(()=>PluginInstallation.Prepare(root,path));
             lock(lifetime) {if(disposed) {package.Dispose(); return ()=>{};} prepared=package;}
@@ -149,7 +152,7 @@ internal sealed class OverlayPanel : IDisposable
         ImGui.SameLine();
         if(ImGui.Button(UiText.T("刷新列表","重新整理","Refresh","一覧更新"))) Run(async()=>{await Task.Run(()=>PluginInstallation.Cleanup(root)); return Refresh;});
         ImGui.SameLine(); if(ImGui.Button(UiText.T("重载配置","重新載入設定","Reload config","設定再読込"))) Runtime("reload-profile");
-        ImGui.SameLine(); if(ImGui.Button(UiText.T("运行状态","執行狀態","Status","稼働状態"))) Runtime("status");
+        ImGui.SameLine(); if(ImGui.Button(UiText.T("输出日志","輸出日誌","Output logs","ログ出力"))) outputLog.Open();
         ImGui.EndDisabled();
         ImGui.Separator();
         var width=Math.Clamp(ImGui.GetContentRegionAvail().X*.36f,190,360);
@@ -273,12 +276,16 @@ internal sealed class OverlayPanel : IDisposable
         var removeTitle=UiText.T("卸载插件","解除安裝","Uninstall plugin","プラグイン削除")+"###uninstall-plugin";
         if(confirmInstall) {confirmInstall=false; ImGui.OpenPopup(installTitle);}
         bool modalOpen=true;
-        if(ImGui.BeginPopupModal(installTitle,ref modalOpen,ImGuiWindowFlags.AlwaysAutoResize))
+        ImGuiAppearance.PrepareModal();
+        if(ImGui.BeginPopupModal(installTitle,ref modalOpen,ImGuiWindowFlags.AlwaysAutoResize|ImGuiWindowFlags.NoSavedSettings|ImGuiWindowFlags.NoMove))
         {
+            ImGuiAppearance.PlaceModal();
             if(prepared!=null)
             {
-                ImGui.TextUnformatted(prepared.Manifest.DisplayName(UiText.Language)+" · "+prepared.Manifest.Version);
+                Gkms.Sdk.PluginUiText.Wrapped(prepared.Manifest.DisplayName(UiText.Language)+" · "+prepared.Manifest.Version);
+                ImGui.BeginChild("install-description",new Vector2(0,Math.Min(180*ImGui.GetFontSize()/18,ImGui.GetIO().DisplaySize.Y*.25f)));
                 Gkms.Sdk.PluginUiText.Wrapped(prepared.Manifest.Description??"");
+                ImGui.EndChild();
                 Gkms.Sdk.PluginUiText.Wrapped(UiText.T("安装后默认停用，配置与资源分别保存。","安裝後預設停用。","Installed plugins are disabled by default.","追加直後は無効です。"));
                 if(ImGui.Button(UiText.T("确认安装","確認安裝","Install","追加")))
                 {var package=prepared; prepared=null; ImGui.CloseCurrentPopup(); Run(async()=>{using(package){var installed=await Task.Run(()=>PluginInstallation.Install(package)); return ()=>{Refresh(); Select(installed.Manifest.Id);};}});}
@@ -289,10 +296,12 @@ internal sealed class OverlayPanel : IDisposable
         if(!modalOpen) {prepared?.Dispose(); prepared=null;}
         modalOpen=true;
         if(confirmRemove) {confirmRemove=false; ImGui.OpenPopup(removeTitle);}
-        if(ImGui.BeginPopupModal(removeTitle,ref modalOpen,ImGuiWindowFlags.AlwaysAutoResize))
+        ImGuiAppearance.PrepareModal();
+        if(ImGui.BeginPopupModal(removeTitle,ref modalOpen,ImGuiWindowFlags.AlwaysAutoResize|ImGuiWindowFlags.NoSavedSettings|ImGuiWindowFlags.NoMove))
         {
-            ImGui.TextUnformatted(selected);
-            Gkms.Sdk.PluginUiText.Wrapped(UiText.T("卸载前先停用；保留插件配置、私有数据与汉化资源。","先停用並保留設定與資源。","Disable and uninstall? Settings, private data and translation resources are kept.","無効化して削除します。個別設定とリソースは保持します。"));
+            ImGuiAppearance.PlaceModal();
+            Gkms.Sdk.PluginUiText.Wrapped(catalog.GetValueOrDefault(selected)?.Manifest.DisplayName(UiText.Language)??selected);
+            Gkms.Sdk.PluginUiText.Wrapped(UiText.T("将停用并卸载此插件。该插件的配置和数据（含资源文件）会保留，重新安装后可继续使用。","將停用並解除安裝此外掛。保留此外掛的設定和資料（含資源檔案），重新安裝後可繼續使用。","Disable and uninstall this plugin? Its settings and data (including resource files) will be kept for reinstallation.","このプラグインを無効化して削除します。設定とデータ（リソースを含む）は再インストール用に保持します。"));
             if(ImGui.Button(UiText.T("确认卸载","確認解除安裝","Uninstall","削除")))
             {var id=selected; CloseSettings(); if(updates.Remove(id,out var update)) update.Dispose(); ImGui.CloseCurrentPopup(); Run(async()=>{var removed=await PluginInstallation.UninstallAsync(root,id); return ()=>{pending.Remove(id); Select(""); Refresh(); if(!removed) status=UiText.T("已停用；占用文件将在下次启动后清理。","已停用；下次啟動清理檔案。","Disabled; locked files will be cleaned up next launch.","無効化済み。使用中のファイルは次回起動後に削除します。");};});}
             ImGui.SameLine(); if(ImGui.Button(UiText.Cancel)) ImGui.CloseCurrentPopup();

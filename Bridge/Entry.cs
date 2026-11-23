@@ -33,7 +33,7 @@ public sealed class Entry : IGameServices,IAdvancedGameServices
             host.Start(Path.Combine(root,"plugins"),Path.Combine(root,"profile.json"),data);
             host.EnableRuntimeControl();
         }
-        catch(Exception error) { Log(error.ToString()); host.Dispose(); throw; }
+        catch(Exception error) { Log("[Error] "+error); host.Dispose(); throw; }
         try
         {
             // Resolve the same cimgui core used by plugin settings, with a single
@@ -43,7 +43,7 @@ public sealed class Entry : IGameServices,IAdvancedGameServices
             overlay=new GameOverlay(root,Path.Combine(game,"version.dll"),Log);
             RuntimeClient.OpenPanel=()=>overlay.SetVisible(true);
         }
-        catch(Exception error) { Log("Game overlay unavailable: "+error); }
+        catch(Exception error) { Log("[Error] Game overlay unavailable: "+error); }
         Log("Runtime started.");
     }
     [UnmanagedCallersOnly]
@@ -71,7 +71,7 @@ public sealed class Entry : IGameServices,IAdvancedGameServices
     }
     private void Log(string message)
     {
-        lock(logLock) File.AppendAllText(logFile,$"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}");
+        lock(logLock) File.AppendAllText(logFile,$"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {Gkms.Sdk.PluginLog.Normalize(message)}{Environment.NewLine}");
     }
     public Type? FindType(string assembly,string fullName)=>runtime.FindType(assembly,fullName);
     public IDisposable Patch(string owner,MethodInfo target,MethodInfo? prefix,MethodInfo? postfix,int priority)=>hooks.Patch(owner,target,prefix,postfix,null,priority);

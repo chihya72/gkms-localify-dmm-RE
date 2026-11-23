@@ -67,7 +67,7 @@ public sealed class PluginHost : IDisposable
     {
         for (var count = 0; count < 128 && pending.TryDequeue(out var action); count++)
         {
-            try { action(); } catch (Exception error) { log(error.GetBaseException().Message); }
+            try { action(); } catch (Exception error) { log("[Error] "+error.GetBaseException().Message); }
         }
         foreach (var (id, item) in finishing.ToArray())
         {
@@ -80,7 +80,7 @@ public sealed class PluginHost : IDisposable
             {
                 FinishCleanup(id);
                 finishingWarnings[id] = error.GetBaseException().Message;
-                log($"{id}: 停用后的恢复未完成: {finishingWarnings[id]}");
+                log($"[Error] {id}: 停用后的恢复未完成: {finishingWarnings[id]}");
             }
         }
     }
@@ -104,7 +104,7 @@ public sealed class PluginHost : IDisposable
     private void ApplyProfile(bool reportFailure)
     {
         // Parse the complete request before touching live callbacks.
-        var catalog = Catalog.Discover(packages, log);
+        var catalog = Catalog.Discover(packages, message => log("[Warning] " + message));
         var profile = Catalog.ReadProfile(profileFile, catalog);
         var enabled = profile.Enabled.Distinct(StringComparer.Ordinal).ToArray();
         var initial = !profileApplied;
@@ -123,11 +123,11 @@ public sealed class PluginHost : IDisposable
         }
         foreach (var id in enabled)
         {
-            if (!catalog.TryGetValue(id, out var package)) { loadErrors[id] = "找不到兼容的插件包。"; log($"{id}: {loadErrors[id]}"); errors.Add(id); continue; }
-            if (!Catalog.Supports(package.Manifest.ApiVersion)) { loadErrors[id] = "SDK 版本不兼容。"; log($"{id}: {loadErrors[id]}"); errors.Add(id); continue; }
+            if (!catalog.TryGetValue(id, out var package)) { loadErrors[id] = "找不到兼容的插件包。"; log($"[Error] {id}: {loadErrors[id]}"); errors.Add(id); continue; }
+            if (!Catalog.Supports(package.Manifest.ApiVersion)) { loadErrors[id] = "SDK 版本不兼容。"; log($"[Error] {id}: {loadErrors[id]}"); errors.Add(id); continue; }
             var options = profile.Settings?.GetValueOrDefault(id) ?? default;
             try { PluginSettings.Validate(package.Manifest.Settings, options); }
-            catch (Exception error) { loadErrors[id] = error.GetBaseException().Message; log($"{id}: {loadErrors[id]}"); errors.Add(id); continue; }
+            catch (Exception error) { loadErrors[id] = error.GetBaseException().Message; log($"[Error] {id}: {loadErrors[id]}"); errors.Add(id); continue; }
             var previous = running.SingleOrDefault(p => p.Scope.Id == id);
             var samePackage = previous != null && previous.Package.Directory == package.Directory &&
                 Equivalent(JsonSerializer.SerializeToElement(previous.Package.Manifest, Catalog.Json), JsonSerializer.SerializeToElement(package.Manifest, Catalog.Json));
@@ -197,13 +197,13 @@ public sealed class PluginHost : IDisposable
             running.Add(new(plugin, scope, loader, package));
             resourceErrors.Remove(id);
             var warnings = (plugin as IPluginDiagnostics)?.Warnings;
-            log(warnings?.Count > 0 ? $"{id}: 插件报告失败：{string.Join("；", warnings)}" : $"{id}: 已加载。");
+            log(warnings?.Count > 0 ? $"[Warning] {id}: 插件报告问题：{string.Join("；", warnings)}" : $"{id}: 已加载。");
             return true;
         }
         catch (Exception error)
         {
             loadErrors[id] = error.GetBaseException().Message;
-            log($"{id}: {error.GetBaseException().Message}");
+            log($"[Error] {id}: {error.GetBaseException().Message}");
             if (!Stop(plugin, scope, loader) && plugin != null && loader != null) running.Add(new(plugin, scope, loader, package));
             return false;
         }
@@ -249,12 +249,12 @@ public sealed class PluginHost : IDisposable
 
     private bool Stop(ILocalifyPlugin? plugin, Scope scope, PluginPackageLoader? loader, bool allowCleanup = false)
     {
-        try { scope.Dispose(); } catch (Exception error) { log($"{scope.Id}: {error.Message}"); }
+        try { scope.Dispose(); } catch (Exception error) { log($"[Error] {scope.Id}: {error.Message}"); }
         try { plugin?.Dispose(); }
         catch (Exception error)
         {
             cleanupErrors[scope.Id] = error.GetBaseException().Message;
-            log($"{scope.Id}: 停用恢复未完成，保留插件和原状态供重试: {error.Message}");
+            log($"[Error] {scope.Id}: 停用恢复未完成，保留插件和原状态供重试: {error.Message}");
             return false;
         }
         cleanupErrors.Remove(scope.Id);
@@ -278,9 +278,9 @@ public sealed class PluginHost : IDisposable
             catch (Exception error)
             {
                 cleanupScope?.Dispose();
-                try { cleanup?.Dispose(); } catch (Exception cleanupError) { log(cleanupError.GetBaseException().Message); }
+                try { cleanup?.Dispose(); } catch (Exception cleanupError) { log("[Error] "+cleanupError.GetBaseException().Message); }
                 finishingWarnings[scope.Id] = error.GetBaseException().Message;
-                log($"{scope.Id}: 停用后的恢复未完成: {finishingWarnings[scope.Id]}");
+                log($"[Error] {scope.Id}: 停用后的恢复未完成: {finishingWarnings[scope.Id]}");
             }
         }
         loader?.Unload();
@@ -408,7 +408,7 @@ public sealed class PluginHost : IDisposable
             return child;
         }
         public Type? FindType(string assembly, string fullName) => game.FindType(assembly, fullName);
-        public void Log(string message) => log($"{Id}: {message}");
+        public void Log(string message) => log(PluginLog.WithSource(message, Id));
         public void Patch(MethodInfo target, MethodInfo? prefix = null, MethodInfo? postfix = null, int priority = 400)
         {
             CheckThread(); patches.Add(game.Patch(Id, target, prefix, postfix, priority));
@@ -426,10 +426,10 @@ public sealed class PluginHost : IDisposable
             if (disposed) return;
             CheckThread();
             disposed = true;
-            try { stopping.Cancel(); } catch (Exception error) { Log($"取消后台工作失败: {error.GetBaseException().Message}"); }
+            try { stopping.Cancel(); } catch (Exception error) { Log($"[Error] 取消后台工作失败: {error.GetBaseException().Message}"); }
             foreach (var patch in patches.AsEnumerable().Reverse().ToArray())
             {
-                try { patch.Dispose(); } catch (Exception e) { Log($"移除回调失败: {e.Message}"); }
+                try { patch.Dispose(); } catch (Exception e) { Log($"[Error] 移除回调失败: {e.Message}"); }
             }
             patches.Clear(); remove?.Invoke(); remove = null;
             stopping.Dispose();

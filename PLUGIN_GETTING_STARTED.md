@@ -121,7 +121,7 @@ if ($LASTEXITCODE -ne 0) { throw "依赖还原失败：$LASTEXITCODE" }
 if ($LASTEXITCODE -ne 0) { throw "插件构建失败：$LASTEXITCODE" }
 ```
 
-编译输出位于 `bin\Release\net6.0`。SDK 不会安装进游戏；这里只还原编译依赖。不要引用 `Gkms.Host`、`Gkms.Manager`、`Gkms.Runtime` 的实现程序集。
+编译输出位于 `bin\Release\net6.0`。SDK 不会安装进游戏；这里只还原编译依赖。不要引用 `Gkms.Host`、`Gkms.Runtime` 的实现程序集。
 
 ## 4. 打包成本地安装 ZIP
 
@@ -159,23 +159,9 @@ Write-Output $zipPath
 
 ## 5. 本地安装和验证
 
-在已部署框架的 `gakumas-local\re` 目录中执行以下命令。`Gkms.Manager.exe` 总是操作它自身所在的框架目录，不能仅靠改变当前工作目录切换目标。
+自行启动已部署框架的游戏，按 **Ctrl+U** →「已安装」→ ZIP 安装入口，选择 `example.hello-1.0.0.zip`。新插件默认停用，勾选「问候入门插件」并保存功能开关；日志 `gakumas-local\re\runtime.log` 应出现带插件 ID 的问候。
 
-```powershell
-$manager = Join-Path $PWD 'Gkms.Manager.exe'
-$package = 'D:\PluginWork\Hello\example.hello-1.0.0.zip'
-[string[]]$arguments = @('install', $package)
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "安装失败：$LASTEXITCODE" }
-
-[string[]]$arguments = @('list')
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "读取插件列表失败：$LASTEXITCODE" }
-```
-
-也可以在游戏已运行时按 Ctrl+U，使用「已安装」页的 ZIP 安装入口。新安装的插件默认停用。在「已安装」中勾选「问候入门插件」，保存功能开关；日志 `gakumas-local\re\runtime.log` 应出现带插件 ID 的问候。
-
-在插件配置页修改「问候内容」并保存，支持热更新时应看到新问候。停用、再启用一次，确认无异常。安装命令成功只说明包已安装，不代表已经执行过游戏入口。请自行启动游戏完成运行验证，管理器命令不会启动游戏。
+在插件配置页修改「问候内容」并保存，支持热更新时应看到新问候。停用、再启用一次，确认无异常。包安装成功只说明文件校验通过，运行入口和游戏行为仍需在游戏中验证。
 
 同 ID 本地 ZIP 不能覆盖已安装插件。调试时可先卸载后重装；配置、插件资源和采集输出会保留。改动 DLL 本身不等于热更新，正式升级应增加插件版本并走订阅更新流程。
 
@@ -219,47 +205,15 @@ if ($LASTEXITCODE -ne 0) { throw "读取插件列表失败：$LASTEXITCODE" }
 
 第三方不要把自己的地址填入「官方地址」。删除或停用订阅源不会卸载插件，但该源不再参与更新检查。
 
-命令行也可添加和查看来源。在目标框架的 `re` 目录执行，先替换占位网址：
-
-```powershell
-$manager = Join-Path $PWD 'Gkms.Manager.exe'
-[string[]]$arguments = @('sources', 'add', '我的插件源', 'https://example.com/plugins/pluginmaster.json')
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "添加来源失败：$LASTEXITCODE" }
-
-[string[]]$arguments = @('sources')
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "读取来源失败：$LASTEXITCODE" }
-```
-
-从输出中复制第三方来源 ID（不是显示名称），用它安装插件：
-
-```powershell
-$sourceId = Read-Host '粘贴 sources 输出中的第三方来源 ID'
-[string[]]$arguments = @('plugins-install', $sourceId, 'example.hello')
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "订阅安装失败：$LASTEXITCODE" }
-```
-
-如果你已按第 5 步本地安装同 ID 插件，不要再次安装；在库中选择该来源下的插件，点「订阅此来源」。命令行对应 `plugins-subscribe <来源ID> example.hello`。自动更新只跟随绑定来源，其他来源的同 ID 高版本不会接管；更换成不同来源需先卸载再安装。
+如果你已按第 5 步本地安装同 ID 插件，不要再次安装；在库中选择该来源下的插件，点「订阅此来源」。自动更新只跟随绑定来源，其他来源的同 ID 高版本不会接管；更换成不同来源需先卸载再安装。
 
 ## 8. 发布下一版
 
 保持 ID 不变，将 `plugin.json` 和项目的插件版本改为 `1.0.1`，重新构建并生成 `example.hello-1.0.1.zip`。先上传 ZIP，再将索引中的 `AssemblyVersion` 及两个下载地址改为新版本；可以用 `Changelog` 添加更新说明。
 
-用户在插件库点击「检查所有插件更新」，再更新单个插件或「更新全部」。命令行检查与更新：
+用户在插件库点击「检查所有插件更新」，再更新单个插件或「更新全部」。
 
-```powershell
-[string[]]$arguments = @('plugins-check')
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "更新检查失败：$LASTEXITCODE" }
-
-[string[]]$arguments = @('plugins-update', 'example.hello')
-& $manager @arguments
-if ($LASTEXITCODE -ne 0) { throw "插件更新失败：$LASTEXITCODE" }
-```
-
-更新保留配置、资源及原启用状态；启动失败时尝试回滚。需要重启且当前已启用的插件，应关闭游戏后通过管理器更新。配置格式变化时保留旧字段或兼容旧格式，使回滚后的旧插件仍能读取配置。SDK/API 升级与插件自身功能升级分别管理，不为普通插件功能改动修改 `apiVersion`。
+更新保留配置、资源及原启用状态；启动失败时尝试回滚。需要重启且当前已启用的插件，先在面板停用并保存，重新启动游戏后再在插件库更新。配置格式变化时保留旧字段或兼容旧格式，使回滚后的旧插件仍能读取配置。SDK/API 升级与插件自身功能升级分别管理，不为普通插件功能改动修改 `apiVersion`。
 
 ## 9. 常见问题和下一步
 
@@ -272,7 +226,7 @@ if ($LASTEXITCODE -ne 0) { throw "插件更新失败：$LASTEXITCODE" }
 | 订阅源解析失败 | 地址是否返回 JSON，是否使用 `GkmsApiLevel`，是否存在重复 ID 或无效版本 |
 | 检查更新提示官方离线包缺失 | 若暂不使用官方源，可在「订阅源」停用官方源；第三方来源仍可独立安装 |
 | 下载包与索引不一致 | 检查 ZIP 内的 ID、版本、API、程序集，确认新 ZIP 已上传而非旧附件 |
-| 本地 ZIP 插件看不到自动更新 | 在库中明确绑定来源，或使用 `plugins-subscribe` |
+| 本地 ZIP 插件看不到自动更新 | 在库中选择对应来源的插件，点击「订阅此来源」 |
 | 相同版本 DLL 改动没有更新 | 增加插件版本并重新发布；`+build` 元数据变化不会触发版本升级 |
 
 继续开发时，先阅读规范中的生命周期、主线程调度与配置章节。实际游戏 Hook 通过 SDK 注册；后台网络和文件工作使用 `Stopping` 取消令牌，Unity 操作用 `Enqueue` 调度。恢复自己接管的状态，释放事件及资源，不释放宿主根作用域。自定义 ImGui 设置页可参考 SDK 包内 `examples\ExampleSettingsUi.cs`，保持与游戏入口分离。

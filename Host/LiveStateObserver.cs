@@ -17,7 +17,7 @@ internal sealed class LiveStateObserver : ILocalifyPlugin
                 var handler = GameMethods.Handler<LiveStateObserver>(callback);
                 context.Patch(method, postfix ? null : handler, postfix ? handler : null, postfix ? -1000 : 1000);
             }
-            catch (NotSupportedException e) { context.Log($"状态观察 {method.Name}: {e.Message}"); }
+            catch (NotSupportedException e) { context.Log(PluginLogLevel.Warning, $"状态观察 {method.Name}: {e.Message}"); }
         }
         var quality = context.FindType("campus-submodule.Runtime", "Campus.Common.CampusQualityManager");
         foreach (var method in quality?.GetMethods(GameMethods.Declared).Where(m => m.Name is "ApplySetting" or "SetReflectionQuality" or "SetLODQuality") ?? Array.Empty<MethodInfo>())

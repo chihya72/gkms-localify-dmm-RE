@@ -4,10 +4,12 @@
   <ItemGroup>
     <Compile Remove="ExamplePlugin.cs;ExampleSettingsUi.cs;ContractProbe.cs" />
     <Compile Include="..\Manager\ProfileEditor.cs" />
+    <Compile Include="..\Manager\LegacyProfile.cs" />
     <Compile Include="..\Manager\PluginInstallation.cs" />
     <Compile Include="..\Manager\PluginRepositories.cs;..\Manager\PluginUpgrade.cs;..\Manager\PluginRepositoryService.cs" />
     <Compile Include="..\Manager\ImGuiAppearance.cs" />
     <Compile Include="..\Manager\ResourceUpdatePanel.cs;..\Manager\ImGuiFilePicker.cs;..\Manager\UiText.cs" />
+    <Compile Include="..\Manager\OutputLogPanel.cs;..\Manager\PluginRepositoryPanel.cs" />
     <ProjectReference Include="Gkms.ExamplePlugin.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>

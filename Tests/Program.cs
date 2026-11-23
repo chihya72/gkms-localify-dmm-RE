@@ -6,6 +6,11 @@ using Gkms.Plugins.Localization;
 using HarmonyLib;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+if (args.Length == 2 && args[0] == "--manager-ui")
+{
+    ManagerUiRegressionTests.Run(args[1]);
+    return 0;
+}
 if (args.Length == 3 && args[0] == "--repositories")
 {
     PluginRepositoryTests.Run(args[2], args[1]);
@@ -104,7 +109,7 @@ PluginApiTests.RunIsolated(work, packages, "--audit");
 PluginApiTests.RunIsolated(work, packages, "--immediate");
 PluginApiTests.RunIsolated(work, packages);
 VerifyUpdate(work, packages);
-VerifyManager(work, Path.GetDirectoryName(Path.GetFullPath(distributionPackages))!);
+VerifyPanelServices(work, Path.GetDirectoryName(Path.GetFullPath(distributionPackages))!);
 PluginInstallationTests.Run(work, distributionPackages);
 PluginRepositoryTests.Run(work, distributionPackages);
 if (args.Length > 3) VerifyPack(args[3]);
@@ -409,7 +414,7 @@ static void VerifyFrameworkAndCapture(string work, string packages)
         UnityEngine.Input.U = true;
         var ctrlReads = UnityEngine.Input.CtrlReads;
         quality.Update();
-        Check(log.Count(line => line == "framework: offline") == 1 && UnityEngine.Input.CtrlReads == ctrlReads, "框架日志；不再轮询 Unity 输入或启动外部管理器");
+        Check(log.Count(line => line == "[Error] framework: offline") == 1 && UnityEngine.Input.CtrlReads == ctrlReads, "框架日志保留 Unity 严重等级；不再轮询 Unity 输入或启动外部管理器");
 
         File.WriteAllText(profile, """{"enabled":["texture-capture","capture"]}""");
         host.Start(packages, profile, data);
@@ -430,12 +435,10 @@ static void VerifyFrameworkAndCapture(string work, string packages)
     UnityEngine.Input.U = false;
 }
 
-static void VerifyManager(string work, string distribution)
+static void VerifyPanelServices(string work, string distribution)
 {
     var data = Directory.CreateDirectory(Path.Combine(work, "manager-fixture", "gakumas-local")).FullName;
     var root = Directory.CreateDirectory(Path.Combine(data, "re")).FullName;
-    foreach (var file in Directory.EnumerateFiles(distribution, "Gkms.*").Concat(Directory.EnumerateFiles(distribution, "*.dll")).Distinct())
-        File.Copy(file, Path.Combine(root, Path.GetFileName(file)));
     foreach (var (id, package) in Catalog.Discover(Path.Combine(distribution, "plugins"), _ => {}))
     {
         var folder = Directory.CreateDirectory(Path.Combine(root, "plugins", id)).FullName;
@@ -443,15 +446,22 @@ static void VerifyManager(string work, string distribution)
         if (package.Manifest.ResourceUpdater != null)
             File.Copy(Path.Combine(package.Directory, package.Manifest.Assembly), Path.Combine(folder, package.Manifest.Assembly));
     }
-    int Run(params string[] args)
+    int Attempt(System.Action action)
     {
-        var info = new System.Diagnostics.ProcessStartInfo(Path.Combine(root,"Gkms.Manager.exe"))
-            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in args) info.ArgumentList.Add(arg);
-        using var process = System.Diagnostics.Process.Start(info)!;
-        process.WaitForExit();
-        return process.ExitCode;
+        try { action(); return 0; }
+        catch (Exception e) when (e is InvalidOperationException or IOException or InvalidDataException or ArgumentException) { return 1; }
     }
+    int Select(bool enabled, params string[] ids) => Attempt(() =>
+        Gkms.Manager.ProfileEditor.Apply(root, Catalog.Discover(Path.Combine(root, "plugins"), _ => { }),
+            ids.ToDictionary(id => id, _ => enabled)));
+    int Update(string id, string? source = null) => Attempt(() =>
+        PluginHost.UpdateResourcesAsync(Catalog.Discover(Path.Combine(root, "plugins"), _ => { })[id], data, source).GetAwaiter().GetResult());
+    int Install(string path) => Attempt(() =>
+    {
+        using var prepared = Gkms.Manager.PluginInstallation.Prepare(root, path);
+        Gkms.Manager.PluginInstallation.Install(prepared);
+    });
+    int Uninstall(string id) => Attempt(() => Gkms.Manager.PluginInstallation.UninstallAsync(root, id).GetAwaiter().GetResult());
     var pluginDir = Path.Combine(root, "plugins");
     var onlyOld = new Dictionary<string, Package>();
     foreach (var (id, assembly) in new[] { ("i18n", "I18n"), ("master", "Master"), ("lyrics", "Lyrics"),
@@ -477,18 +487,18 @@ static void VerifyManager(string work, string distribution)
     }
     File.WriteAllText(fileName, """{"enabled":["i18n","story","localization","master","lyrics"],"settings":{"localization":{"story":false,"font":false,"textTest":true},"camera":{"speed":5}}}""");
     Check(Catalog.ReadProfile(fileName, onlyOld).Enabled.Contains("i18n"), "仅安装旧包时保留原选择");
-    Check(Run("enable","ios-login","unknown") != 0 && Catalog.ReadProfile(fileName).Enabled.SequenceEqual(new[]{"localization"}), "批量选择应全部生效或保留原配置");
-    Check(Run("enable","ios-login") == 0 && Run("disable","ios-login") == 0 && Run("list") == 0 &&
+    Check(Select(true, "ios-login","unknown") != 0 && Catalog.ReadProfile(fileName).Enabled.SequenceEqual(new[]{"localization"}), "批量选择应全部生效或保留原配置");
+    Check(Select(true, "ios-login") == 0 && Select(false, "ios-login") == 0 &&
           Catalog.ReadProfile(fileName).Enabled.SequenceEqual(new[]{"localization"}) &&
           Catalog.ReadProfile(fileName, current).Settings!["localization"].GetProperty("textTest").GetBoolean(), "管理器保留诊断设置");
     using (var saved = JsonDocument.Parse(File.ReadAllText(fileName)))
         Check(saved.RootElement.GetProperty("enabled").GetArrayLength() == 1 &&
               saved.RootElement.GetProperty("settings").GetProperty("localization").EnumerateObject().Single().Name == "textTest",
               "保存配置时合并重复项并移除分项开关");
-    Check(Run("disable", "localization") == 0 && Catalog.ReadProfile(fileName, current).Enabled.Length == 0, "总开关可一并关闭");
+    Check(Select(false, "localization") == 0 && Catalog.ReadProfile(fileName, current).Enabled.Length == 0, "总开关可一并关闭");
     File.WriteAllText(Path.Combine(data, "localizationConfig.json"),
         """{"enabled":true,"targetFrameRate":120,"replaceFont":false,"dumpRuntimeTexture":true,"enableFreeCamera":true,"loginAsIOS":true,"dbgMode":true,"unlockAllLive":true,"unlockAllLiveCostume":false}""");
-    Check(Run("import-legacy") == 0, "旧版选项导入");
+    Check(Attempt(() => Gkms.Manager.LegacyProfile.Import(root, current)) == 0, "旧版选项导入");
     var imported = Catalog.ReadProfile(fileName);
     Check(imported.Enabled.Contains("camera") && imported.Enabled.Contains("frame-rate") && imported.Enabled.Contains("ios-login") &&
         imported.Enabled.Contains("localization") && imported.Enabled.Contains("capture") && !imported.Settings!["localization"].TryGetProperty("font", out _) &&
@@ -511,21 +521,21 @@ static void VerifyManager(string work, string distribution)
     var textZip = MakeArchive(root, "text", ("local-files/localization.json", """{"ui":"中文"}"""));
     var texZip = MakeArchive(root, "textures", ("texture2d/texture_version.txt", "v1"), ("texture2d/title.png", "fixture"));
     File.WriteAllText(Path.Combine(data, "config.json"), JsonSerializer.Serialize(new { useAPIAssetsURL = textZip, useAPITextureAssetsURL = texZip }));
-    Check(Run("disable", "localization", "textures") == 0 && Run("update", "localization") == 0 && Run("update", "textures", texZip) == 0,
+    Check(Select(false, "localization", "textures") == 0 && Update("localization") == 0 && Update("textures", texZip) == 0,
           "插件未启用也可通过管理器调用各自 DLL 的更新入口");
     var textResources = TestPackages.Resources(pluginDir, "localization");
     var textureResources = TestPackages.Resources(pluginDir, "textures");
     Check(File.ReadAllText(Path.Combine(textResources, "localization.json")).Contains("中文") &&
           File.ReadAllText(Path.Combine(textureResources, "title.png")) == "fixture" &&
           !Directory.Exists(Path.Combine(data,"local-files")) && !Directory.Exists(Path.Combine(data,"texture2d")), "两种资源进入各自插件目录，不创建旧共享目录");
-    Check(Run("update", "textures", textZip) != 0 && Run("update", "capture", texZip) != 0 &&
+    Check(Update("textures", textZip) != 0 && Update("capture", texZip) != 0 &&
           File.Exists(Path.Combine(textureResources, "title.png")), "错误的包类型或不支持更新的插件不会改写资源");
     var pluginZip = Path.GetFullPath(Path.Combine(distribution, "..", "..", "plugin-packages", "Gkms.FrameRate.zip"));
-    Check(Run("uninstall", "frame-rate") == 0 && Run("install", pluginZip) == 0 && Run("install", pluginZip) != 0 &&
-          Run("enable", "frame-rate") == 0 && Run("uninstall", "frame-rate") == 0, "管理器 CLI 安装、启用、卸载和重复安装处理");
+    Check(Uninstall("frame-rate") == 0 && Install(pluginZip) == 0 && Install(pluginZip) != 0 &&
+          Select(true, "frame-rate") == 0 && Uninstall("frame-rate") == 0, "面板服务安装、启用、卸载和重复安装处理");
     Check(!Catalog.Discover(pluginDir, _ => { }).ContainsKey("frame-rate") &&
           Catalog.ReadProfile(fileName).Settings!["frame-rate"].GetProperty("fps").GetInt32() == 120 &&
-          File.Exists(Path.Combine(textResources, "localization.json")), "CLI 卸载保留设置和翻译资源");
+          File.Exists(Path.Combine(textResources, "localization.json")), "卸载保留设置和翻译资源");
 }
 
 static void VerifyUpdate(string work, string packages)

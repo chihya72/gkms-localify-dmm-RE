@@ -43,6 +43,13 @@ OVERLAY_API void fixture_overlay_mouse(int x,int y,int down) {
 }
 OVERLAY_API void fixture_overlay_key(int key,int down) { SendMessageW(probeWindow,down?WM_KEYDOWN:WM_KEYUP,key,0); }
 OVERLAY_API void fixture_overlay_char(int value) { SendMessageW(probeWindow,WM_CHAR,value,0); }
+OVERLAY_API void fixture_overlay_ime_char(int value) { SendMessageW(probeWindow,WM_IME_CHAR,value,0); }
+OVERLAY_API void fixture_overlay_disable_ime() { ImmAssociateContext(probeWindow,nullptr); }
+OVERLAY_API int fixture_overlay_has_ime() {
+    auto context=ImmGetContext(probeWindow);
+    if(context) ImmReleaseContext(probeWindow,context);
+    return context?1:0;
+}
 OVERLAY_API int fixture_overlay_game_inputs() { return gameInputs; }
 OVERLAY_API int fixture_overlay_pixels(void* output,int capacity,int* width,int* height) {
     ComPtr<ID3D11Texture2D> back,copy;

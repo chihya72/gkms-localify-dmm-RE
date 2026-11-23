@@ -21,10 +21,10 @@ public sealed class PluginComponents : IDisposable
             failures[name] = error.GetBaseException().Message;
             var failed = false;
             try { scope.Dispose(); }
-            catch (Exception cleanup) { failed = true; context.Log($"{name} 回调清理失败: {cleanup.GetBaseException().Message}"); }
-            context.Log($"{name} 加载失败: {error.GetBaseException().Message}");
+            catch (Exception cleanup) { failed = true; context.Log(PluginLogLevel.Error, $"{name} 回调清理失败: {cleanup.GetBaseException().Message}"); }
+            context.Log(PluginLogLevel.Error, $"{name} 加载失败: {error.GetBaseException().Message}");
             try { component.Dispose(); }
-            catch (Exception cleanup) { failed = true; context.Log($"{name} 清理失败: {cleanup.GetBaseException().Message}"); }
+            catch (Exception cleanup) { failed = true; context.Log(PluginLogLevel.Error, $"{name} 清理失败: {cleanup.GetBaseException().Message}"); }
             if (failed)
             {
                 cleanupPending.Push((scope, component));

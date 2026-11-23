@@ -76,6 +76,8 @@ public sealed unsafe class GameOverlay : IDisposable
             }
             if(Environment.CurrentManagedThreadId!=thread) throw new InvalidOperationException("DX11 Present moved to a different UI thread.");
             ImGui.SetCurrentContext(context);
+            // Dear ImGui's Win32 IME callback uses this HWND to position candidates.
+            var viewport=ImGui.GetMainViewport(); viewport.PlatformHandleRaw=window();
             var inputIo=ImGui.GetIO(); inputIo.DisplaySize=new Vector2(width,height); inputIo.DisplayFramebufferScale=Vector2.One; inputIo.DeltaTime=seconds;
             if(GetCursorPos(out var point) && ScreenToClient(window(),ref point)) inputIo.AddMousePosEvent(point.X,point.Y);
             fixed(Input* buffer=input)
@@ -89,7 +91,7 @@ public sealed unsafe class GameOverlay : IDisposable
         catch(Exception error)
         {
             lastError=error.GetBaseException().Message;
-            try {log("overlay: "+error);} catch { }
+            try {log("[Error] overlay: "+error);} catch { }
             // A plugin can leave ImGui stacks unbalanced when it throws. Drop this
             // context without rendering it; reopening starts on the plugin list.
             Destroy(); return 0;

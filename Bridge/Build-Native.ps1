@@ -8,7 +8,10 @@ if($LASTEXITCODE -ne 0) { throw "vswhere failed: $LASTEXITCODE" }
 if(!$vsRoot) { throw 'Visual Studio C++ x64 build tools are required.' }
 $vcRoot=Get-ChildItem -LiteralPath (Join-Path $vsRoot 'VC\Tools\MSVC') -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 $kitsRoot=Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
-$sdk=Get-ChildItem -LiteralPath (Join-Path $kitsRoot 'Include') -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+$sdk=Get-ChildItem -LiteralPath (Join-Path $kitsRoot 'Include') -Directory |
+    Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' -and (Test-Path -LiteralPath (Join-Path $_.FullName 'um\Windows.h')) } |
+    Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+if (!$sdk) { throw 'A Windows SDK with desktop headers is required.' }
 $dotnetRoot=Join-Path $env:ProgramFiles 'dotnet'
 $hostPack=Get-ChildItem -LiteralPath (Join-Path $dotnetRoot 'packs\Microsoft.NETCore.App.Host.win-x64') -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 $hostNative=Join-Path $hostPack.FullName 'runtimes\win-x64\native'
