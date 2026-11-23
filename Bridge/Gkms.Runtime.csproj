@@ -20,7 +20,7 @@
     <Copy SourceFiles="@(NativeImGui)" DestinationFolder="$(StageRoot)\gakumas-local\re\runtimes\win-x64\native" />
     <Copy SourceFiles="$(TargetDir)version.dll" DestinationFolder="$(StageRoot)" />
     <Copy SourceFiles="$(MSBuildThisFileDirectory)MinHook.LICENSE.txt" DestinationFolder="$(StageRoot)\gakumas-local\re" />
-    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\LICENSE;$(MSBuildThisFileDirectory)..\README.md;$(MSBuildThisFileDirectory)..\PLUGIN_DEVELOPMENT.md;$(MSBuildThisFileDirectory)..\AUDIT.md" DestinationFolder="$(StageRoot)\gakumas-local\re" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\LICENSE;$(MSBuildThisFileDirectory)..\README.md;$(MSBuildThisFileDirectory)..\PLUGIN_DEVELOPMENT.md;$(MSBuildThisFileDirectory)..\PLUGIN_GETTING_STARTED.md;$(MSBuildThisFileDirectory)..\AUDIT.md" DestinationFolder="$(StageRoot)\gakumas-local\re" />
     <Delete Files="$(StageRoot)\BepInEx\plugins\GkmsLocalify\Gkms.BepInEx.dll;$(StageRoot)\BepInEx\plugins\GkmsLocalify\Gkms.Host.dll;$(StageRoot)\BepInEx\plugins\GkmsLocalify\Gkms.Sdk.dll;$(StageRoot)\BepInEx\plugins\GkmsLocalify\ImGui.NET.dll" />
   </Target>
 </Project>

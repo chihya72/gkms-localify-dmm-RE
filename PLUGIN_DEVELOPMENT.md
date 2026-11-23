@@ -1,5 +1,7 @@
 # Gakumas Localify 插件开发规范（API 2）
 
+第一次开发插件请先阅读 [第三方插件开发入门](PLUGIN_GETTING_STARTED.md)，其中提供完整可编译示例、SDK 还原命令及打包订阅流程。本文件用于查阅接口与行为细节。
+
 本规范适用于全部内置插件和第三方插件。新插件只依赖公开 SDK，以 DLL + `plugin.json` 安装到自己的插件目录；不需要在宿主或管理器中登记名称、参数或资源更新入口。插件内部的类组织、算法和功能范围由作者决定。
 
 当前运行环境：Windows x64，原生 `version.dll` 入口托管 .NET 6，运行时 IL2CPP API 与 MinHook 提供游戏接入。使用 .NET SDK 8 或更新版本编译，插件目标框架为 `net6.0`。插件运行时依赖由其包提供，SDK 由宿主统一提供；无需 BepInEx 或生成 interop 程序集。

@@ -1,5 +1,7 @@
 # Gakumas Localify RE
 
+第三方开发者请先阅读 [插件开发入门](PLUGIN_GETTING_STARTED.md)：从安装 SDK、编写插件到打包发布和添加订阅源。接口细节见 [插件开发规范](PLUGIN_DEVELOPMENT.md)。
+
 本仓库只维护 RE 框架：`Sdk`、`Host`、`Bridge`、`Manager` 以及测试工具。官方 14 个插件及汉化资源更新实现已迁至独立本地仓库 `D:\chinosk6\gkms-official-plugins`。两者使用独立 Git 仓库、解决方案和发行目录；框架默认构建不依赖官方插件源码，插件通过 SDK NuGet 包构建。
 
 学园偶像大师 DMM 版的模块化插件框架。玩家按 Ctrl+U 打开游戏内 Dear ImGui 面板，管理插件、勾选功能并编辑插件配置；每个插件有自己的 DLL 和清单。整个界面不使用 WinForms。`localization` 统一启停界面与通用文本、剧情、主页语音气泡、主数据翻译及 Live 歌词文本。Live 首次自动显示歌词归属 `live-unlock` 的 Live 子开关。下载资源保存在各自插件安装目录的 `resources` 子目录中。
