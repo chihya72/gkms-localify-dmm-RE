@@ -23,6 +23,16 @@ internal static class PluginRepositoryTests
     private static async Task RunAsync(string work, string packages)
     {
         var root = Directory.CreateDirectory(Path.Combine(work, "repositories")).FullName;
+        Check(PluginRepositoryStore.Sources(PluginRepositoryStore.Read(root)).Single() is { Enabled: true, Bundled: false } online &&
+            online.Url == PluginRepositoryStore.DefaultOfficialUrl, "fresh installations use the official online catalog");
+        PluginRepositoryStore.WriteAtomic(Path.Combine(root, "plugin-repositories.json"), new { officialEnabled = false });
+        Check(PluginRepositoryStore.Read(root) is { OfficialEnabled: false } missing && missing.OfficialUrl == PluginRepositoryStore.DefaultOfficialUrl,
+            "older settings without an address inherit the default and preserve disabled state");
+        PluginRepositoryStore.SetOfficialUrl(root, "https://example.com/custom.json");
+        Check(PluginRepositoryStore.Read(root).OfficialUrl == "https://example.com/custom.json", "custom official address is preserved");
+        PluginRepositoryStore.SetOfficialUrl(root, "");
+        PluginRepositoryStore.Enable(root, "official", true);
+        Check(PluginRepositoryStore.Sources(PluginRepositoryStore.Read(root)).Single().Bundled, "explicit offline selection survives settings round trip");
         var withoutBundle = await new PluginRepositoryClient(root).RefreshAsync();
         Check(withoutBundle.Single().Plugins.Length == 0 && withoutBundle.Single().Error!.Contains("官方离线仓库"), "standalone framework reports how to install the separately distributed official bundle");
         var moving = Directory.CreateDirectory(Path.Combine(root, "rename-source")).FullName;

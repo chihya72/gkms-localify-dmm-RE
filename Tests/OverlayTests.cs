@@ -20,6 +20,8 @@ internal static unsafe class OverlayTests
         T Function<T>(string name) where T:Delegate=>Marshal.GetDelegateForFunctionPointer<T>(NativeLibrary.GetExport(module,name));
         var window=Function<Create>("fixture_overlay_create")(); Check(window!=0,"independent DX11 test window");
         var root=Path.Combine(work,"overlay"); Directory.CreateDirectory(root);
+        // This UI fixture exercises the bundled catalog without depending on a published release or network timing.
+        File.WriteAllText(Path.Combine(root,"plugin-repositories.json"), """{"officialUrl":""}""");
         File.Copy(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(packages))!,"official-plugins.zip"),Path.Combine(root,"official-plugins.zip"),true);
         var profile=Path.Combine(root,"profile.json");
         File.WriteAllText(profile,"""{"enabled":[],"settings":{"another.plugin":{"keep":42}}}""");

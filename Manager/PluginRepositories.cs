@@ -14,7 +14,7 @@ internal sealed record PluginSource(string Id, string Name, string Url, bool Ena
 internal sealed record PluginOrigin(string SourceId, string SourceUrl);
 internal sealed record RepositorySettings
 {
-    public string OfficialUrl { get; init; } = "";
+    public string OfficialUrl { get; init; } = PluginRepositoryStore.DefaultOfficialUrl;
     public bool OfficialEnabled { get; init; } = true;
     public PluginSource[] Sources { get; init; } = Array.Empty<PluginSource>();
     public Dictionary<string, PluginOrigin> Origins { get; init; } = new();
@@ -44,8 +44,7 @@ internal sealed record PluginOffer(PluginSource Source, RepositoryPlugin Plugin)
 internal sealed record RepositoryResult(PluginSource Source, PluginOffer[] Plugins, string? Error = null);
 internal sealed record PluginTransferProgress(string Message, long Received = 0, long? Total = null, bool CanCancel = true);
 
-// Dalamud-style distribution metadata, with an explicit Gkms API to avoid treating
-// FFXIV assemblies as executable Gkms packages. Package manifests remain unchanged.
+// Distribution metadata with an explicit API level. Package manifests remain unchanged.
 internal sealed record PluginMasterEntry(string InternalName, string Name, string AssemblyVersion, int GkmsApiLevel,
     string Author, string Description, string DownloadLinkInstall)
 {
@@ -84,7 +83,7 @@ internal static class PluginRepositoryFormat
         {
             var entries = JsonSerializer.Deserialize<PluginMasterEntry[]>(bytes, Catalog.Json)!;
             if (entries.Any(p => p == null || p.GkmsApiLevel < 1))
-                throw new InvalidDataException("pluginmaster.json 必须声明 GkmsApiLevel；卫月插件不能在 Gkms 中运行。");
+                throw new InvalidDataException("pluginmaster.json 必须声明有效的 GkmsApiLevel。");
             return entries.Select(p => p.ToPlugin()).ToArray();
         }
         var index = JsonSerializer.Deserialize<RepositoryIndex>(bytes, Catalog.Json);
@@ -128,6 +127,7 @@ internal sealed class PluginVersion : IComparable<PluginVersion>
 
 internal static class PluginRepositoryStore
 {
+    public const string DefaultOfficialUrl = "https://github.com/chihya72/gkms-localify-dmm-RE-official-plugins/releases/latest/download/pluginmaster.json";
     private const string SettingsFile = "plugin-repositories.json";
     public static RepositorySettings Read(string root)
     {

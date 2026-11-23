@@ -6,19 +6,17 @@
 
 当前运行环境：Windows x64，原生 `version.dll` 入口托管 .NET 6，运行时 IL2CPP API 与 MinHook 提供游戏接入。使用 .NET SDK 8 或更新版本编译，插件目标框架为 `net6.0`。插件运行时依赖由其包提供，SDK 由宿主统一提供；无需 BepInEx 或生成 interop 程序集。
 
-## 1. 采用卫月的哪些设计
+## 1. 插件组成
 
-参考 Dalamud 的稳定插件标识、清单、生命周期入口、宿主服务和插件配置原则：
+插件以稳定 ID、清单和独立程序集发布，通过 SDK 与框架交互：
 
-| 卫月中的设计 | 本项目对应规则 |
+| 接口或文件 | 用途 |
 | --- | --- |
-| `IDalamudPlugin` / `IDisposable` | `ILocalifyPlugin.Start(IPluginContext)` / `Dispose()` |
-| 入口注入宿主服务 | `context.Services()` 返回 `IPluginServices`，无需引用 Host 或 Bridge |
-| 清单描述插件与 API 等级 | `plugin.json` 的 ID、版本、元数据和 `apiVersion` |
-| 插件配置服务 | 宿主传入只读配置快照；管理器统一保存并请求应用 |
-| `UiBuilder.Draw` / `OpenConfigUi` | `IPluginUiBuilder` 同名事件，第三方直接调用 ImGui.NET；内置插件使用同一设置入口 |
-
-参考：[Dalamud 项目与入口](https://dalamud.dev/plugin-development/project-layout/)、[清单元数据](https://dalamud.dev/plugin-development/plugin-metadata/)、[服务接口](https://dalamud.dev/api/Dalamud.Plugin/Interfaces/IDalamudPluginInterface/)、[UiBuilder 绘制事件](https://dalamud.dev/api/Dalamud.Interface/Interfaces/IUiBuilder/)。这是为本项目实现的接口，不能直接加载 Dalamud 插件 DLL。
+| `ILocalifyPlugin.Start(IPluginContext)` / `Dispose()` | 启动与释放插件 |
+| `context.Services()` / `IPluginServices` | 获取宿主服务，无需引用 Host 或 Bridge |
+| `plugin.json` | 声明 ID、版本、元数据和 API 等级 |
+| 配置快照与保存服务 | 读取参数，由管理器统一保存并请求应用 |
+| `IPluginUiBuilder` | 注册绘制和配置页事件，使用 ImGui.NET 绘制界面 |
 
 ## 2. 必须遵守的核心规则
 
@@ -227,9 +225,9 @@ public sealed class SettingsUi : IPluginSettingsUi
 
 ## 8. 当前开发版本
 
-框架尚未正式发布，不维护历史 API。宿主只接受当前 `apiVersion: 2`，全部内置插件、第三方示例及元数据使用同一规则；其他 API 等级在发现阶段被拒绝。
+宿主只接受当前 `apiVersion: 2`，全部官方插件、第三方示例及元数据使用同一规则；其他 API 等级在发现阶段被拒绝。
 
-SDK 包版本为 `2.0.0`，程序集版本为 `2.0.0.0`。开发期间以同一仓库构建产物为准，接口修改后重新编译插件，不保留旧接口适配层。正式发布时再确定版本演进政策。原 DMM 用户配置导入属于资源与业务数据迁移，不是旧 SDK 支持。
+SDK 包版本为 `2.0.1`，程序集版本保持 `2.0.0.0`，API 等级仍为 2；本次发布未改变公共接口。兼容更新递增包版本，破坏兼容性的接口变更须提升 API 等级并重新编译插件。SDK 包在[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载。原 DMM 用户配置导入属于资源与业务数据迁移。
 
 ## 9. 开始编写自己的插件
 
@@ -265,7 +263,7 @@ $sdk = 'D:\gkms-localify-dmm-RE\Sdk\bin\Release\net6.0\Gkms.Sdk.dll'
 if ($LASTEXITCODE -ne 0) { throw "插件构建失败 $LASTEXITCODE" }
 ```
 
-也可从框架本地打包产物安装 `Gkms.Sdk.2.0.0.nupkg`；本仓库不假定该包已发布到公共 NuGet。打包命令在仓库根目录执行：
+也可从框架本地打包产物安装 `Gkms.Sdk.2.0.1.nupkg`；本仓库不假定该包已发布到公共 NuGet。打包命令在仓库根目录执行：
 
 ```powershell
 $project = Join-Path $PWD 'Sdk\Gkms.Sdk.csproj'
@@ -279,7 +277,7 @@ if ($LASTEXITCODE -ne 0) { throw "SDK 打包失败 $LASTEXITCODE" }
 
 ### 插件订阅源格式与发布
 
-源为 HTTPS JSON 索引，每个 ID 只列一个当前可安装版本。参考 [Bluefissure 的卫月仓库](https://raw.githubusercontent.com/Bluefissure/DalamudPlugins/Bluefissure/pluginmaster.json)，提供数组式 `pluginmaster.json`，保留现有对象式 `index.json`。两者共用订阅、安装、更新、校验和回滚流程。这里只复用仓库组织方式；卫月 DLL、`DalamudApiLevel` 和四段程序集版本不兼容 Gkms。
+源为 HTTPS JSON 索引，每个 ID 只列一个当前可安装版本。支持数组式 `pluginmaster.json` 和对象式 `index.json`，两者共用订阅、安装、更新、校验和回滚流程。索引须声明 Gkms API 等级，版本使用 SemVer。
 
 推荐发布格式：
 
@@ -308,9 +306,9 @@ if ($LASTEXITCODE -ne 0) { throw "SDK 打包失败 $LASTEXITCODE" }
 ]
 ```
 
-`InternalName` 对应 ZIP 中的 `id`，`AssemblyVersion` 对应 `version`，`GkmsApiLevel` 对应 `apiVersion`；这些字段与 `Name`、`Author`、`Description`、`DownloadLinkInstall` 必填。没有 `GkmsApiLevel` 的卫月索引会显示框架不兼容错误。`DownloadLinkUpdate` 可省略，此时更新复用安装地址；提供时更新使用该地址，仍须下载完整 ZIP 并验证清单。其他字段可省略。`RepoUrl` 仅供展示和复制，框架不会自动打开它。
+`InternalName` 对应 ZIP 中的 `id`，`AssemblyVersion` 对应 `version`，`GkmsApiLevel` 对应 `apiVersion`；这些字段与 `Name`、`Author`、`Description`、`DownloadLinkInstall` 必填。没有有效 `GkmsApiLevel` 的索引会显示格式错误。`DownloadLinkUpdate` 可省略，此时更新复用安装地址；提供时更新使用该地址，仍须下载完整 ZIP 并验证清单。其他字段可省略。`RepoUrl` 仅供展示和复制，框架不会自动打开它。
 
-版本使用 SemVer（例如 `1.2.0` 或 `1.3.0-beta.1`），与 ZIP 内清单的版本字符串完全一致；升级按 SemVer 优先级比较，构建元数据不触发更新。API 必须与 ZIP 清单一致；不兼容的 Gkms API 版本可显示，但不能安装。当前每个 ID 只有一个发布版本，不实现卫月的测试通道、下载统计或运行时加载策略。
+版本使用 SemVer（例如 `1.2.0` 或 `1.3.0-beta.1`），与 ZIP 内清单的版本字符串完全一致；升级按 SemVer 优先级比较，构建元数据不触发更新。API 必须与 ZIP 清单一致；不兼容的 Gkms API 版本可显示，但不能安装。当前每个 ID 只有一个发布版本，暂不提供测试通道或下载统计。
 
 兼容的对象式索引：
 

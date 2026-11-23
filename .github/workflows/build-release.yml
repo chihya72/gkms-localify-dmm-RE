@@ -1,0 +1,84 @@
+name: Build, test and release
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: framework-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  verify:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+      - name: Build framework and SDK packages
+        run: |
+          & (Join-Path $PWD 'Pack-Release.ps1')
+          if (-not $? -or $LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $props = [xml](Get-Content -LiteralPath (Join-Path $PWD 'Directory.Build.props') -Raw)
+            if ($env:GITHUB_REF_NAME -ne ('v' + $props.Project.PropertyGroup.Version)) { throw 'Tag and package version differ' }
+          }
+      - uses: actions/checkout@v7
+        with:
+          repository: chihya72/gkms-localify-dmm-RE-official-plugins
+          path: out/official-source
+          persist-credentials: false
+      - name: Build all official plugins against the packaged SDK
+        run: |
+          $parameters = @{ SdkFeed = (Join-Path $PWD 'out\sdk') }
+          & (Join-Path $PWD 'out\official-source\Plugins\Build-Repository.ps1') @parameters
+          if (-not $? -or $LASTEXITCODE -ne 0) { throw 'Official plugin build failed' }
+      - name: Run offline integration and native overlay tests
+        run: |
+          $parameters = @{ OfficialPluginOutput = (Join-Path $PWD 'out\official-source\out\Release'); Overlay = $true }
+          & (Join-Path $PWD 'Tests\Test-OfficialPlugins.ps1') @parameters
+          if (-not $? -or $LASTEXITCODE -ne 0) { throw 'Integration tests failed' }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: framework-release
+          path: |
+            out/Release/Gkms-RE-*-win-x64.zip
+            out/sdk/Gkms.Sdk.*.nupkg
+          if-no-files-found: error
+          retention-days: 14
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: framework-release
+          path: artifacts
+      - name: Publish tested packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = @(Get-ChildItem -LiteralPath (Join-Path $PWD 'artifacts') -Recurse -File | ForEach-Object FullName)
+          [string[]]$arguments = @('release', 'create', $env:GITHUB_REF_NAME, '--repo', $env:GITHUB_REPOSITORY, '--verify-tag', '--draft', '--title', "RE $env:GITHUB_REF_NAME", '--generate-notes') + $assets
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release upload failed' }
+          [string[]]$arguments = @('release', 'edit', $env:GITHUB_REF_NAME, '--repo', $env:GITHUB_REPOSITORY, '--draft=false')
+          if ($env:GITHUB_REF_NAME.Contains('-')) { $arguments += '--prerelease' } else { $arguments += '--latest' }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

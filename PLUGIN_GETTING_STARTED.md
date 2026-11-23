@@ -6,9 +6,9 @@
 
 需要 Windows x64、PowerShell 7 和 .NET SDK 8 或以上。插件编译目标为 `net6.0`；实际使用插件还需要匹配当前 API 的 RE 框架及其运行环境。开发普通 C# 插件不需要编译框架的 C++ 入口，也不需要 BepInEx 或预生成的游戏 interop DLL。
 
-当前 SDK 包为 `Gkms.Sdk.2.0.0.nupkg`，插件清单使用 `apiVersion: 2`。SDK 包版本、API 等级和你自己的插件版本是三个不同的值。
+当前 SDK 包为 `Gkms.Sdk.2.0.1.nupkg`，插件清单使用 `apiVersion: 2`。SDK 包版本、API 等级和你自己的插件版本是三个不同的值。
 
-从框架维护者取得 SDK 包，放到自己的本地 NuGet 源目录，例如 `D:\PluginWork\sdk-feed`。本地框架构建生成的包位于 `out\sdk`；目前不要假定公共 NuGet 已发布 `Gkms.Sdk`。如果自行构建框架，可在框架仓库运行 `Build.ps1`，具体要求见框架 README。
+从[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载 SDK NuGet 包，放到自己的本地 NuGet 源目录，例如 `D:\PluginWork\sdk-feed`。本地框架构建生成的包位于 `out\sdk`；目前不要假定公共 NuGet 已发布 `Gkms.Sdk`。如果自行构建框架，可在框架仓库运行 `Build.ps1`，具体要求见框架 README。
 
 SDK 包内包含：
 
@@ -35,7 +35,7 @@ SDK 包内包含：
     <Version>1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gkms.Sdk" Version="[2.0.0]" ExcludeAssets="runtime" />
+    <PackageReference Include="Gkms.Sdk" Version="[2.0.1]" ExcludeAssets="runtime" />
     <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
@@ -208,7 +208,7 @@ if ($LASTEXITCODE -ne 0) { throw "读取插件列表失败：$LASTEXITCODE" }
 - `InternalName`、`AssemblyVersion`、`GkmsApiLevel`、`Assembly` 分别与包内的 ID、版本、API、DLL 名对应。下载后管理器会核对这些值。
 - 下载地址可写为相对索引的路径，也可以写完整 HTTPS Release 附件地址。更新仍需完整 ZIP，不是差分补丁。
 - 每个源内，同 ID 只列一个当前版本。当前没有稳定/测试双通道；插件版本采用 SemVer，例如 `1.0.0`、`1.1.0-beta.1`，不是四段程序集版本。
-- `GkmsApiLevel` 是本框架的 API，不是卫月的 `DalamudApiLevel`，两种框架的 DLL 不互通。
+- `GkmsApiLevel` 必须与插件清单的 `apiVersion` 一致；插件必须引用本框架 SDK。
 - 正式发布先上传版本化 ZIP，最后更新索引。不要覆盖旧版本 URL 对应的安装包。
 
 框架也兼容对象式 `index.json`，格式见开发规范。索引和包可托管于独立发布位置，无需为 SDK 另建源码仓库。
@@ -265,7 +265,7 @@ if ($LASTEXITCODE -ne 0) { throw "插件更新失败：$LASTEXITCODE" }
 
 | 现象 | 检查方向 |
 | --- | --- |
-| 找不到 `Gkms.Sdk` 包 | 本地源是否直接包含 `.nupkg`，版本是否为 `2.0.0`；不要假定它已在公共 NuGet 发布 |
+| 找不到 `Gkms.Sdk` 包 | 本地源是否直接包含 `.nupkg`，版本是否为 `2.0.1`；不要假定它已在公共 NuGet 发布 |
 | 找不到插件入口 | DLL 文件名、完整命名空间、公开类型和无参构造函数是否与清单一致 |
 | 已安装但没有问候 | 新安装默认停用；运行验证需已启动游戏并启用插件，查看 `runtime.log` |
 | 参数页没有控件 | `settings` 是否存在且有效；本例不需要声明 `settingsUi` |

@@ -204,7 +204,9 @@ internal sealed class PluginRepositoryPanel : IDisposable
         ImGui.BeginDisabled(Busy);
         var official = settings.OfficialEnabled;
         if (ImGui.Checkbox("启用官方插件源", ref official)) ChangeSource(() => PluginRepositoryStore.Enable(root, "official", official));
-        Gkms.Sdk.PluginUiText.Wrapped("官方 14 个插件单独发行。可填入在线索引地址，或将官方离线仓库 official-plugins.zip 放入 re 目录。");
+        Gkms.Sdk.PluginUiText.Wrapped("已内置官方在线订阅源。离线使用时，将 official-plugins.zip 放入 re 目录并清空地址后保存。");
+        if (ImGui.Button("恢复默认官方源"))
+            ChangeSource(() => PluginRepositoryStore.SetOfficialUrl(root, PluginRepositoryStore.DefaultOfficialUrl));
         ImGui.SetNextItemWidth(-1); ImGui.InputTextWithHint("##official-source", "官方 pluginmaster.json 或 index.json 地址；留空使用随附源", ref officialUrl, 2048);
         if (ImGui.Button("保存官方地址"))
         {
