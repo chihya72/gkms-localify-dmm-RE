@@ -6,7 +6,7 @@
 
 需要 Windows x64、PowerShell 7 和 .NET SDK 8 或以上。插件编译目标为 `net6.0`；实际使用插件还需要匹配当前 API 的 RE 框架及其运行环境。开发普通 C# 插件不需要编译框架的 C++ 入口，也不需要 BepInEx 或预生成的游戏 interop DLL。
 
-当前 SDK 包为 `Gkms.Sdk.2.0.3.nupkg`，插件清单使用 `apiVersion: 2`。SDK 包版本、API 等级和你自己的插件版本是三个不同的值。
+当前 SDK 包为 `Gkms.Sdk.2.0.4.nupkg`，插件清单使用 `apiVersion: 2`。SDK 包版本、API 等级和你自己的插件版本是三个不同的值。
 
 从[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载 SDK NuGet 包，放到自己的本地 NuGet 源目录，例如 `D:\PluginWork\sdk-feed`。本地框架构建生成的包位于 `out\sdk`；目前不要假定公共 NuGet 已发布 `Gkms.Sdk`。如果自行构建框架，可在框架仓库运行 `Build.ps1`，具体要求见框架 README。
 
@@ -35,7 +35,7 @@ SDK 包内包含：
     <Version>1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gkms.Sdk" Version="[2.0.3]" ExcludeAssets="runtime" />
+    <PackageReference Include="Gkms.Sdk" Version="[2.0.4]" ExcludeAssets="runtime" />
     <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
@@ -219,7 +219,7 @@ Write-Output $zipPath
 
 | 现象 | 检查方向 |
 | --- | --- |
-| 找不到 `Gkms.Sdk` 包 | 本地源是否直接包含 `.nupkg`，版本是否为 `2.0.3`；不要假定它已在公共 NuGet 发布 |
+| 找不到 `Gkms.Sdk` 包 | 本地源是否直接包含 `.nupkg`，版本是否为 `2.0.4`；不要假定它已在公共 NuGet 发布 |
 | 找不到插件入口 | DLL 文件名、完整命名空间、公开类型和无参构造函数是否与清单一致 |
 | 已安装但没有问候 | 新安装默认停用；运行验证需已启动游戏并启用插件，查看 `runtime.log` |
 | 参数页没有控件 | `settings` 是否存在且有效；本例不需要声明 `settingsUi` |

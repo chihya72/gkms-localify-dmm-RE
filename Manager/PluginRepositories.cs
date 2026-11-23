@@ -127,7 +127,8 @@ internal sealed class PluginVersion : IComparable<PluginVersion>
 
 internal static class PluginRepositoryStore
 {
-    public const string DefaultOfficialUrl = "https://github.com/chihya72/gkms-localify-dmm-RE-official-plugins/releases/latest/download/pluginmaster.json";
+    public const string DefaultOfficialUrl = "https://raw.githubusercontent.com/chihya72/gkms-localify-dmm-RE-official-plugins/main/pluginmaster.json";
+    internal const string FormerOfficialUrl = "https://github.com/chihya72/gkms-localify-dmm-RE-official-plugins/releases/latest/download/pluginmaster.json";
     private const string SettingsFile = "plugin-repositories.json";
     public static RepositorySettings Read(string root)
     {
@@ -138,6 +139,7 @@ internal static class PluginRepositoryStore
             value.Sources.Any(s => s == null || s.Id == "official" || string.IsNullOrWhiteSpace(s.Id) || string.IsNullOrWhiteSpace(s.Name) || s.Url == null) ||
             value.Sources.Select(s => s.Id).Distinct().Count() != value.Sources.Length)
             throw new InvalidDataException("插件源配置无效。");
+        if (value.OfficialUrl == FormerOfficialUrl) value = value with { OfficialUrl = DefaultOfficialUrl };
         if (value.OfficialUrl.Length != 0) NormalizeUrl(value.OfficialUrl);
         foreach (var source in value.Sources) NormalizeUrl(source.Url);
         return value;

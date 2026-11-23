@@ -50,6 +50,15 @@ internal static class PluginRepositoryTests
             "older settings without an address inherit the default and preserve disabled state");
         PluginRepositoryStore.SetOfficialUrl(root, "https://example.com/custom.json");
         Check(PluginRepositoryStore.Read(root).OfficialUrl == "https://example.com/custom.json", "custom official address is preserved");
+        PluginRepositoryStore.WriteAtomic(Path.Combine(root, "plugin-repositories.json"), new RepositorySettings
+        {
+            OfficialUrl = PluginRepositoryStore.FormerOfficialUrl, OfficialEnabled = false,
+            Origins = new() { ["frame-rate"] = new("official", PluginRepositoryStore.FormerOfficialUrl) }
+        });
+        var migrated = PluginRepositoryStore.Read(root);
+        Check(migrated.OfficialUrl == PluginRepositoryStore.DefaultOfficialUrl && !migrated.OfficialEnabled &&
+            PluginRepositoryStore.Owns(migrated, "frame-rate", PluginRepositoryStore.Sources(migrated).Single()),
+            "former release source migrates to raw without losing disabled state or official ownership");
         PluginRepositoryStore.SetOfficialUrl(root, "");
         PluginRepositoryStore.Enable(root, "official", true);
         Check(PluginRepositoryStore.Sources(PluginRepositoryStore.Read(root)).Single().Bundled, "explicit offline selection survives settings round trip");

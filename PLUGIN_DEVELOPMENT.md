@@ -227,7 +227,7 @@ public sealed class SettingsUi : IPluginSettingsUi
 
 宿主只接受当前 `apiVersion: 2`，全部官方插件、第三方示例及元数据使用同一规则；其他 API 等级在发现阶段被拒绝。
 
-SDK 包版本为 `2.0.3`，程序集版本保持 `2.0.0.0`，API 等级仍为 2；新增兼容现有插件的日志等级扩展，原有 `Log(string)` 仍可使用。兼容更新递增包版本，破坏兼容性的接口变更须提升 API 等级并重新编译插件。SDK 包在[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载。原 DMM 用户配置导入属于资源与业务数据迁移。
+SDK 包版本为 `2.0.4`，程序集版本保持 `2.0.0.0`，API 等级仍为 2；新增兼容现有插件的日志等级扩展，原有 `Log(string)` 仍可使用。兼容更新递增包版本，破坏兼容性的接口变更须提升 API 等级并重新编译插件。SDK 包在[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载。原 DMM 用户配置导入属于资源与业务数据迁移。
 
 ## 9. 开始编写自己的插件
 
@@ -263,7 +263,7 @@ $sdk = 'D:\gkms-localify-dmm-RE\Sdk\bin\Release\net6.0\Gkms.Sdk.dll'
 if ($LASTEXITCODE -ne 0) { throw "插件构建失败 $LASTEXITCODE" }
 ```
 
-也可从框架本地打包产物安装 `Gkms.Sdk.2.0.3.nupkg`；本仓库不假定该包已发布到公共 NuGet。打包命令在仓库根目录执行：
+也可从框架本地打包产物安装 `Gkms.Sdk.2.0.4.nupkg`；本仓库不假定该包已发布到公共 NuGet。打包命令在仓库根目录执行：
 
 ```powershell
 $project = Join-Path $PWD 'Sdk\Gkms.Sdk.csproj'

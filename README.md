@@ -21,12 +21,12 @@
 新安装已内置以下地址，打开「插件库」即可获取官方 14 个插件：
 
 ```text
-https://github.com/chihya72/gkms-localify-dmm-RE-official-plugins/releases/latest/download/pluginmaster.json
+https://raw.githubusercontent.com/chihya72/gkms-localify-dmm-RE-official-plugins/main/pluginmaster.json
 ```
 
-旧配置会保留原地址与停用状态；需要切换时，在「订阅源」点击「恢复默认官方源」。第三方来源可在同一页面添加。
+旧官方 Release 地址会自动迁移到上述 Raw 地址，自定义地址和停用状态会保留。也可在「订阅源」点击「恢复默认官方源」，或添加第三方来源。
 
-离线使用：从[官方插件 Release](https://github.com/chihya72/gkms-localify-dmm-RE-official-plugins/releases/latest) 下载 `official-plugins.zip`，放入 `gakumas-local\re`，在「订阅源」清空官方地址后保存。
+官方插件只通过源码仓库和订阅源分发，不单独创建 GitHub Release。
 
 ## 开发与构建
 
