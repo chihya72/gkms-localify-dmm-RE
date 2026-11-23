@@ -13,6 +13,7 @@ public sealed unsafe class GameOverlay : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int Frame(int width,int height,float dpi,float seconds,int generation);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int Start(Frame frame,nint window);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void Toggle(int value);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void Capture(int mouse,int keyboard);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int Number();
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate nint Pointer();
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void Stop();
@@ -27,9 +28,12 @@ public sealed unsafe class GameOverlay : IDisposable
     [DllImport("user32.dll")] private static extern bool ScreenToClient(nint window,ref Point point);
     [StructLayout(LayoutKind.Sequential)] private struct Point {public int X,Y;}
     private readonly string root;
+    private readonly bool pollCursor;
     private readonly Action<string> log;
     private readonly Frame frame;
     private readonly Toggle toggle;
+    private readonly Capture capture;
+    private readonly Number capturesInput;
     private readonly Stop stop;
     private readonly Number isOpen;
     private readonly Pointer window;
@@ -45,15 +49,16 @@ public sealed unsafe class GameOverlay : IDisposable
     public int RenderedFrames {get;private set;}
     public GameOverlay(string root,string nativeLibrary,Action<string> log,nint explicitWindow=0)
     {
-        this.root=root; this.log=log;
+        this.root=root; this.log=log; pollCursor=explicitWindow==0;
         var module=NativeLibrary.Load(nativeLibrary);
         T Function<T>(string name) where T:Delegate=>Marshal.GetDelegateForFunctionPointer<T>(NativeLibrary.GetExport(module,name));
         toggle=Function<Toggle>("GkmsOverlaySetOpen"); stop=Function<Stop>("GkmsOverlayStop"); isOpen=Function<Number>("GkmsOverlayIsOpen");
+        capture=Function<Capture>("GkmsOverlaySetInputCapture"); capturesInput=Function<Number>("GkmsOverlayCapturesInput");
         window=Function<Pointer>("GkmsOverlayWindow"); read=Function<Read>("GkmsOverlayReadInput"); font=Function<Font>("GkmsOverlayFont"); render=Function<Render>("GkmsOverlayRender");
         frame=DrawFrame;
         var result=Function<Start>("GkmsOverlayStart")(frame,explicitWindow);
         if(result!=0) throw new InvalidOperationException($"DX11 overlay hook initialization failed: {result}");
-        Gkms.Sdk.LiveGameState.InputCapture = () => Visible;
+        Gkms.Sdk.LiveGameState.InputCapture = () => capturesInput()!=0;
         log("Dear ImGui game overlay ready. Ctrl+U toggles the in-game panel.");
     }
     public void SetVisible(bool value)=>toggle(value?1:0);
@@ -79,13 +84,15 @@ public sealed unsafe class GameOverlay : IDisposable
             // Dear ImGui's Win32 IME callback uses this HWND to position candidates.
             var viewport=ImGui.GetMainViewport(); viewport.PlatformHandleRaw=window();
             var inputIo=ImGui.GetIO(); inputIo.DisplaySize=new Vector2(width,height); inputIo.DisplayFramebufferScale=Vector2.One; inputIo.DeltaTime=seconds;
-            if(GetCursorPos(out var point) && ScreenToClient(window(),ref point)) inputIo.AddMousePosEvent(point.X,point.Y);
+            // Explicit fixture windows are driven by their window messages, independent of the user's desktop pointer.
+            if(pollCursor && GetCursorPos(out var point) && ScreenToClient(window(),ref point)) inputIo.AddMousePosEvent(point.X,point.Y);
             fixed(Input* buffer=input)
             {
                 int count;
                 do {count=read(buffer,input.Length); for(int i=0;i<count;i++) InputEvent(input[i]);} while(count==input.Length);
             }
             ImGui.NewFrame(); var open=panel!.Draw(); ImGui.Render();
+            capture(inputIo.WantCaptureMouse?1:0,inputIo.WantCaptureKeyboard?1:0);
             Submit(ImGui.GetDrawData()); ++RenderedFrames; return open?1:0;
         }
         catch(Exception error)

@@ -46,6 +46,23 @@ internal static unsafe class OverlayTests
             SaveBmp(Path.Combine(work,"overlay-preview.bmp"),rgba,width,height);
             var mouse=Function<Mouse>("fixture_overlay_mouse"); var inputs=Function<Number>("fixture_overlay_game_inputs"); var before=inputs();
             void Click(int x,int y) {mouse(x,y,-1); Check(frame()==0,"mouse hover frame"); mouse(x,y,1); Check(frame()==0,"mouse down frame"); mouse(x,y,0); Check(frame()==0,"mouse up frame");}
+            Click(5,5); Check(inputs()==before+1,"open overlay forwards clicks outside its windows to the game");
+            Check(frame()==0 && Gkms.Sdk.LiveGameState.InputCapture?.Invoke()==false,"game input remains available after focusing outside the panel");
+            before=inputs();
+            var mouseUps=Function<Number>("fixture_overlay_game_mouse_ups"); var beforeMouseUps=mouseUps();
+            Click(150,90); Check(inputs()==before,"panel clicks do not reach the game");
+            mouse(150,419,-1); Check(frame()==0,"hover selectable row before panel drag");
+            mouse(150,419,1); Check(frame()==0,"begin panel drag");
+            mouse(5,5,-1); Check(frame()==0,"drag beyond panel edge");
+            mouse(5,5,0); Check(frame()==0,"release panel drag outside");
+            Check(inputs()==before,"panel-owned drag remains isolated outside its bounds");
+            Check(mouseUps()==beforeMouseUps,"panel drag release does not leak into the game");
+            mouse(5,5,-1); Check(frame()==0,"hover game before game-owned drag");
+            mouse(5,5,1); Check(frame()==0,"begin game-owned drag");
+            mouse(150,90,-1); Check(frame()==0,"drag from game into panel");
+            mouse(150,90,0); Check(frame()==0,"release game-owned drag over panel");
+            Check(inputs()==before+1 && mouseUps()==beforeMouseUps+1,$"game receives both edges of a drag across the panel (down {inputs()-before}, up {mouseUps()-beforeMouseUps})");
+            before=inputs();
             void WaitForManager()
             {
                 const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
@@ -115,8 +132,10 @@ internal static unsafe class OverlayTests
             Click(55,122); Click(65,160); Check(frame()==0,"in-game ZIP picker frame");
             fixed(byte* ptr=rgba) Check(pixels(ptr,size,out width,out height)==size,"read picker pixels");
             SaveBmp(Path.Combine(work,"overlay-picker.bmp"),rgba,width,height);
-            mouse(70,150,1); mouse(70,150,0); Check(inputs()==before,"open overlay consumes mouse input");
-            toggle(); Check(!overlay.Visible,"Ctrl+U closes overlay"); mouse(70,150,1); Check(inputs()==before+1,"closed overlay restores game input");
+            mouse(70,150,-1); Check(frame()==0,"hover panel before input isolation check");
+            var beforePanelClick=inputs();
+            mouse(70,150,1); mouse(70,150,0); Check(inputs()==beforePanelClick,"panel-owned mouse input stays isolated while open");
+            toggle(); Check(!overlay.Visible,"Ctrl+U closes overlay"); mouse(70,150,1); Check(inputs()==beforePanelClick+1,"closed overlay restores game input");
             Check(Function<Resize>("fixture_overlay_resize")(900,720)==0,"ResizeBuffers releases overlay references");
             toggle(); Check(frame()==0 && overlay.Visible,"render after resizing");
             var changed = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(profile))!.AsObject();

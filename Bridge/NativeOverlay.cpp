@@ -13,6 +13,7 @@
 #include <mutex>
 #include <vector>
 #include <algorithm>
+#include <iterator>
 #include "MinHook.h"
 using Microsoft::WRL::ComPtr;
 #define OVERLAY_API extern "C" __declspec(dllexport)
@@ -29,9 +30,12 @@ Present presentOriginal{}; Resize resizeOriginal{};
 void* presentTarget{}; void* resizeTarget{};
 std::atomic<FrameCallback> frameCallback{};
 std::atomic<bool> visible{false};
+std::atomic<bool> captureMouse{false},captureKeyboard{false};
 std::recursive_mutex renderMutex;
 std::mutex inputMutex;
 std::vector<OverlayInput> inputs;
+// Preserve the owner of each press through its release, including drags across the panel edge.
+int mouseOwners[5]{},keyOwners[256]{};
 std::atomic<HWND> gameWindow{}; HWND testWindow{}; std::atomic<WNDPROC> previousProc{};
 IDXGISwapChain* currentChain{};
 ComPtr<ID3D11Device> device;
@@ -69,6 +73,9 @@ void UpdateIme(HWND window,bool active) {
 void SetVisible(bool value) {
     std::lock_guard<std::mutex> lock(inputMutex);
     if(visible.exchange(value)==value) return;
+    captureMouse=false; captureKeyboard=false;
+    std::fill(std::begin(mouseOwners),std::end(mouseOwners),0);
+    std::fill(std::begin(keyOwners),std::end(keyOwners),0);
     if(value) { hadClip=GetClipCursor(&oldClip)!=0; ClipCursor(nullptr); }
     else if(hadClip && gameWindow && GetForegroundWindow()==gameWindow) { ClipCursor(&oldClip); hadClip=false; }
     inputs.clear(); inputs.push_back({static_cast<UINT>(value?WM_SETFOCUS:WM_KILLFOCUS),0,0});
@@ -76,6 +83,45 @@ void SetVisible(bool value) {
 }
 bool InputMessage(UINT message) {
     return (message>=WM_MOUSEFIRST && message<=WM_MOUSELAST) || (message>=WM_KEYFIRST && message<=WM_KEYLAST) || message==WM_INPUT;
+}
+bool CaptureMessage(UINT message,WPARAM wparam,LPARAM lparam) {
+    std::lock_guard<std::mutex> lock(inputMutex);
+    bool mouse=captureMouse.load(),keyboard=captureKeyboard.load();
+    int button=-1; bool down=false,up=false;
+    switch(message) {
+        case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: button=0; down=true; break;
+        case WM_LBUTTONUP: button=0; up=true; break;
+        case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: button=1; down=true; break;
+        case WM_RBUTTONUP: button=1; up=true; break;
+        case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: button=2; down=true; break;
+        case WM_MBUTTONUP: button=2; up=true; break;
+        case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK: button=GET_XBUTTON_WPARAM(wparam)==XBUTTON1?3:4; down=true; break;
+        case WM_XBUTTONUP: button=GET_XBUTTON_WPARAM(wparam)==XBUTTON1?3:4; up=true; break;
+    }
+    if(button>=0) {
+        if(down) mouseOwners[button]=mouse?1:2;
+        bool owned=mouseOwners[button]?mouseOwners[button]==1:mouse;
+        if(up) mouseOwners[button]=0;
+        return owned;
+    }
+    bool draggingUi=std::any_of(std::begin(mouseOwners),std::end(mouseOwners),[](int owner){return owner==1;});
+    bool draggingGame=std::any_of(std::begin(mouseOwners),std::end(mouseOwners),[](int owner){return owner==2;});
+    if(draggingUi || draggingGame) mouse=draggingUi;
+    if(message>=WM_MOUSEFIRST && message<=WM_MOUSELAST) return mouse;
+    if(message==WM_INPUT) {
+        RAWINPUTHEADER header{}; UINT size=sizeof(header);
+        if(GetRawInputData(reinterpret_cast<HRAWINPUT>(lparam),RID_HEADER,&header,&size,sizeof(header))==sizeof(header))
+            return header.dwType==RIM_TYPEMOUSE?mouse:header.dwType==RIM_TYPEKEYBOARD?keyboard:false;
+        return false;
+    }
+    if((message==WM_KEYDOWN || message==WM_SYSKEYDOWN || message==WM_KEYUP || message==WM_SYSKEYUP) && wparam<256) {
+        bool released=message==WM_KEYUP || message==WM_SYSKEYUP;
+        if(!released && !keyOwners[wparam]) keyOwners[wparam]=keyboard?1:2;
+        bool owned=keyOwners[wparam]?keyOwners[wparam]==1:keyboard;
+        if(released) keyOwners[wparam]=0;
+        return owned;
+    }
+    return keyboard;
 }
 LRESULT CALLBACK WindowProc(HWND window,UINT message,WPARAM wparam,LPARAM lparam) {
     if(message==imeStateMessage) { UpdateIme(window,visible.load()); return 0; }
@@ -88,26 +134,32 @@ LRESULT CALLBACK WindowProc(HWND window,UINT message,WPARAM wparam,LPARAM lparam
         }
         return 0;
     }
-    if(message==WM_KILLFOCUS || message==WM_SETFOCUS) { std::lock_guard<std::mutex> lock(inputMutex); inputs.push_back({message,wparam,lparam}); }
+    if(message==WM_KILLFOCUS || message==WM_SETFOCUS) {
+        std::lock_guard<std::mutex> lock(inputMutex); inputs.push_back({message,wparam,lparam});
+        if(message==WM_KILLFOCUS) {
+            std::fill(std::begin(mouseOwners),std::end(mouseOwners),0);
+            std::fill(std::begin(keyOwners),std::end(keyOwners),0);
+        }
+    }
     if(visible) {
         UpdateIme(window,true);
         // Unity may suppress IME composition when no game text box has focus.
         // Let the OS process composition/candidates; enqueue committed text once.
-        if(message==WM_IME_CHAR) {
+        if(message==WM_IME_CHAR && captureKeyboard) {
             std::lock_guard<std::mutex> lock(inputMutex);
             if(inputs.size()<4096) inputs.push_back({WM_CHAR,wparam,lparam});
             return 0;
         }
-        if((message>=WM_IME_STARTCOMPOSITION && message<=WM_IME_COMPOSITION) ||
-           (message>=WM_IME_SETCONTEXT && message<=WM_IME_KEYUP) || message==WM_INPUTLANGCHANGE)
+        if(captureKeyboard && ((message>=WM_IME_STARTCOMPOSITION && message<=WM_IME_COMPOSITION) ||
+           (message>=WM_IME_SETCONTEXT && message<=WM_IME_KEYUP) || message==WM_INPUTLANGCHANGE))
             return DefWindowProcW(window,message,wparam,lparam);
         if(InputMessage(message) && message!=WM_INPUT) {
             std::lock_guard<std::mutex> lock(inputMutex);
             if(inputs.size()<4096) inputs.push_back({message,wparam,lparam});
         }
-        if(message==WM_SETCURSOR && LOWORD(lparam)==HTCLIENT) { SetCursor(LoadCursorW(nullptr,MAKEINTRESOURCEW(32512))); return TRUE; }
-        if(message==WM_INPUT) return DefWindowProcW(window,message,wparam,lparam);
-        if(InputMessage(message)) return 0;
+        if(message==WM_SETCURSOR && LOWORD(lparam)==HTCLIENT && captureMouse) { SetCursor(LoadCursorW(nullptr,MAKEINTRESOURCEW(32512))); return TRUE; }
+        if(InputMessage(message) && CaptureMessage(message,wparam,lparam))
+            return message==WM_INPUT?DefWindowProcW(window,message,wparam,lparam):0;
     }
     return previousProc?CallWindowProcW(previousProc,window,message,wparam,lparam):DefWindowProcW(window,message,wparam,lparam);
 }
@@ -239,6 +291,8 @@ OVERLAY_API int GkmsOverlayStart(FrameCallback callback,HWND explicitWindow) {
 }
 OVERLAY_API void GkmsOverlaySetOpen(int value) { SetVisible(value!=0); }
 OVERLAY_API int GkmsOverlayIsOpen() { return visible?1:0; }
+OVERLAY_API void GkmsOverlaySetInputCapture(int mouse,int keyboard) { captureMouse=mouse!=0; captureKeyboard=keyboard!=0; }
+OVERLAY_API int GkmsOverlayCapturesInput() { return visible && (captureMouse || captureKeyboard)?1:0; }
 OVERLAY_API HWND GkmsOverlayWindow() { return gameWindow; }
 OVERLAY_API int GkmsOverlayReadInput(OverlayInput* destination,int capacity) {
     std::lock_guard<std::mutex> lock(inputMutex);

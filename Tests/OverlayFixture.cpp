@@ -5,8 +5,8 @@ HWND probeWindow{};
 ComPtr<IDXGISwapChain> probeChain;
 ComPtr<ID3D11Device> probeDevice;
 ComPtr<ID3D11DeviceContext> probeContext;
-int gameInputs{};
-LRESULT CALLBACK ProbeWindow(HWND w,UINT m,WPARAM p,LPARAM l) {if(m==WM_LBUTTONDOWN || m==WM_KEYDOWN) ++gameInputs; return DefWindowProcW(w,m,p,l);}
+int gameInputs{},gameMouseUps{};
+LRESULT CALLBACK ProbeWindow(HWND w,UINT m,WPARAM p,LPARAM l) {if(m==WM_LBUTTONDOWN || m==WM_KEYDOWN) ++gameInputs; if(m==WM_LBUTTONUP) ++gameMouseUps; return DefWindowProcW(w,m,p,l);}
 }
 OVERLAY_API HWND fixture_overlay_create() {
     WNDCLASSW cls{}; cls.lpfnWndProc=ProbeWindow; cls.hInstance=GetModuleHandleW(nullptr); cls.lpszClassName=L"GkmsOfflineOverlayTest"; RegisterClassW(&cls);
@@ -51,6 +51,7 @@ OVERLAY_API int fixture_overlay_has_ime() {
     return context?1:0;
 }
 OVERLAY_API int fixture_overlay_game_inputs() { return gameInputs; }
+OVERLAY_API int fixture_overlay_game_mouse_ups() { return gameMouseUps; }
 OVERLAY_API int fixture_overlay_pixels(void* output,int capacity,int* width,int* height) {
     ComPtr<ID3D11Texture2D> back,copy;
     if(FAILED(probeChain->GetBuffer(0,IID_PPV_ARGS(&back)))) return -1;
