@@ -34,5 +34,8 @@ if ($Overlay) {
     [string[]]$arguments = @($tests, '--overlay', $plugins, $work)
     & dotnet @arguments
     if ($LASTEXITCODE -ne 0) { throw "Overlay verification failed: $LASTEXITCODE" }
+    [string[]]$arguments = @($tests, '--manager-ui', $work)
+    & dotnet @arguments
+    if ($LASTEXITCODE -ne 0) { throw "Manager UI verification failed: $LASTEXITCODE" }
 }
 Write-Output "Integration artifacts: $work"

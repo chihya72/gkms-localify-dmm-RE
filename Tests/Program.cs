@@ -6,6 +6,11 @@ using Gkms.Plugins.Localization;
 using HarmonyLib;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+if (args.Length == 2 && args[0] == "--published-repository")
+{
+    PluginRepositoryTests.VerifyPublishedAsync(args[1]).GetAwaiter().GetResult();
+    return 0;
+}
 if (args.Length == 2 && args[0] == "--manager-ui")
 {
     ManagerUiRegressionTests.Run(args[1]);
@@ -437,6 +442,7 @@ static void VerifyFrameworkAndCapture(string work, string packages)
 
 static void VerifyPanelServices(string work, string distribution)
 {
+    Check(!Directory.EnumerateFiles(distribution, "Gkms.Manager.*").Any(), "发行目录只包含游戏内面板，不携带独立管理器");
     var data = Directory.CreateDirectory(Path.Combine(work, "manager-fixture", "gakumas-local")).FullName;
     var root = Directory.CreateDirectory(Path.Combine(data, "re")).FullName;
     foreach (var (id, package) in Catalog.Discover(Path.Combine(distribution, "plugins"), _ => {}))

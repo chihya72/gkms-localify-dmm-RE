@@ -14,6 +14,26 @@ internal static class PluginRepositoryTests
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFileW(string name, uint access, uint share, nint attributes, uint disposition, uint flags, nint template);
     public static void Run(string work, string packages) => RunAsync(work, packages).GetAwaiter().GetResult();
+    public static async Task VerifyPublishedAsync(string work)
+    {
+        var root = Path.Combine(work, "published-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var service = new PluginRepositoryService(root);
+        var result = (await service.RefreshAsync()).Single();
+        Check(result.Error == null, "official HTTPS index: " + result.Error);
+        Check(result.Source.Url == PluginRepositoryStore.DefaultOfficialUrl && result.Plugins.Length == 14,
+            "built-in source discovers 14 released official plugins without configuration");
+        foreach (var offer in result.Plugins)
+        {
+            var package = await service.InstallAsync(offer, false);
+            Check(package.Manifest.Id == offer.Plugin.Id && package.Manifest.Version == offer.Plugin.Version &&
+                File.Exists(Path.Combine(package.Directory, package.Manifest.Assembly)), "published package installation: " + offer.Plugin.Id);
+            Check(PluginRepositoryStore.Owns(PluginRepositoryStore.Read(root), offer.Plugin.Id, result.Source), "official subscription ownership");
+            Console.WriteLine($"Published install PASS: {offer.Plugin.Id} {offer.Plugin.Version}");
+        }
+        Check(Catalog.ReadProfile(Path.Combine(root, "profile.json")).Enabled.Length == 0, "downloaded plugins remain disabled");
+        Console.WriteLine("Published repository PASS: default HTTPS source downloaded and installed all 14 packages. Artifacts: " + root);
+    }
     private static void Check(bool condition, string message) { if (!condition) throw new Exception("Repositories: " + message); }
     private static async Task Fails(Func<Task> action, string message)
     {
