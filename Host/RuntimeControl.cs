@@ -64,8 +64,10 @@ internal sealed class RuntimeControl : IDisposable
         Directory.CreateDirectory(root);
         lastWrite = File.GetLastWriteTimeUtc(profile);
         current = this;
+        // Enter the async listener synchronously so its first pipe exists before advertising readiness.
+        // Scheduling its creation on the thread pool can exceed the client's connect timeout on a busy runner.
+        _ = ListenAsync();
         File.WriteAllText(marker, JsonSerializer.Serialize(new { processId = Environment.ProcessId }, Wire));
-        _ = Task.Run(ListenAsync);
     }
     public static void Update()
     {
