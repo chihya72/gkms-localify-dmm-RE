@@ -220,7 +220,7 @@ internal static class TextStartupTests
             ["bom"] = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes("剧情\r\n正文")).ToArray(),
             ["utf16"] = Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes("UTF16 剧情")).ToArray(),
             ["ctrlz"] = Encoding.UTF8.GetBytes("正文\u001a不可见"),
-            ["nul"] = Encoding.UTF8.GetBytes("正文\0不可见")
+            ["embedded-null"] = Encoding.UTF8.GetBytes("正文\0不可见")
         };
         foreach (var (name, bytes) in cases)
         {
