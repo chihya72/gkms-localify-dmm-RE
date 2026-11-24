@@ -70,21 +70,33 @@ internal static class DmmParityTests
         File.WriteAllBytes(Path.Combine(others, "img_test.png"), new byte[] {99});
         File.WriteAllBytes(Path.Combine(others, "sactx_test.png"), new byte[] {99});
         File.WriteAllBytes(Path.Combine(nested, "img_nested.png"), new byte[] {43});
+        File.WriteAllBytes(Path.Combine(image, "img_duplicate.png"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(nested, "img_duplicate.png"), new byte[] {45});
         var profile = Path.Combine(root, "textures.json"); File.WriteAllText(profile, """{"enabled":["textures"]}""");
         var texture = new UnityEngine.Texture2D(8,8) {name="img_test", hideFlags=4};
         var other = new UnityEngine.Texture2D(8,8) {name="sactx_test"};
         var recursive = new UnityEngine.Texture2D(8,8) {name="img_nested"};
+        var duplicate = new UnityEngine.Texture2D(8,8) {name="img_duplicate"};
+        var duplicateWithExtension = new UnityEngine.Texture2D(8,8) {name="img_duplicate.png"};
         var original = texture.Pixels.ToArray(); var canvas = new UnityEngine.CanvasRenderer();
         using (var host = new PluginHost(new TestGame(), _ => {}))
         {
             host.Start(packages, profile, root); Check(host.Active.Contains("textures"), "texture plugin loads");
             canvas.SetTexture(texture); canvas.SetTexture(other); canvas.SetTexture(recursive);
+            canvas.SetTexture(duplicate); canvas.SetTexture(duplicateWithExtension);
+            Check(duplicate.Pixels.SequenceEqual(new byte[] {45}) && duplicateWithExtension.Pixels.SequenceEqual(new byte[] {45}),
+                "all same-name PNG candidates retained: corrupt first file falls through, with or without extension");
             Check(texture.Pixels.SequenceEqual(new byte[] {42}) && texture.hideFlags == 36, "failed direct candidate falls through to PNG and sets DontUnloadUnusedAsset");
             Check(other.width == 8 && recursive.Pixels.SequenceEqual(new byte[] {43}), "category isolation and recursive same-category lookup");
             File.WriteAllBytes(Path.Combine(image, "img_test"), new byte[] {44}); host.ReloadResources("textures");
             Check(texture.Pixels.SequenceEqual(new byte[] {44}), "reloaded direct candidate has original priority");
+            Check(duplicate.Pixels.SequenceEqual(new byte[] {45}), "resource reload retains same-name fallback candidates");
+            File.WriteAllBytes(Path.Combine(image, "img_duplicate.png"), new byte[] {46}); host.ReloadResources("textures");
+            Check(duplicate.Pixels.SequenceEqual(new byte[] {46}) && duplicateWithExtension.Pixels.SequenceEqual(new byte[] {46}),
+                "fixed first candidate regains priority on reload");
         }
         Check(texture.Pixels.SequenceEqual(original) && texture.width == 8 && texture.hideFlags == 4, "hot disable restores original pixels and flags on same object");
+        Check(duplicate.width == 8 && duplicateWithExtension.width == 8, "same-name replacements also restore original textures on disable");
     }
     private static void TextRules(string root)
     {

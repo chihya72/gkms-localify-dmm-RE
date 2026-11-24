@@ -20,11 +20,17 @@ internal static class ResourceSourceTests
         var payload = bytes.ToArray();
         var saved = Path.Combine(root, "saved.zip"); var once = Path.Combine(root, "once.zip");
         File.WriteAllBytes(saved, payload); File.WriteAllBytes(once, payload);
-        File.WriteAllText(Path.Combine(root, "re", "profile.json"), JsonSerializer.Serialize(new { settings = new Dictionary<string, object> { ["localization"] = new { updateSource = saved } } }));
+        File.WriteAllText(Path.Combine(root, "re", "profile.json"), JsonSerializer.Serialize(new { settings = new Dictionary<string, object>
+            { ["localization"] = new { updateSource = saved }, ["textures"] = new { updateSource = saved } } }));
         var release = await PluginHost.CheckResourcesAsync(package, root, "");
         Check(release.Download == saved, "空白手动来源使用已保存默认来源");
         release = await PluginHost.CheckResourcesAsync(package, root, once);
         Check(release.Download == once && File.ReadAllText(Path.Combine(root, "re", "profile.json")).Contains("saved.zip"), "本次来源覆盖默认但不改写配置");
+        var textures = Catalog.Discover(packages, _ => { })["textures"];
+        Check((await PluginHost.CheckResourcesAsync(textures, root, "")).Download == saved,
+            "贴图原版默认地址可被用户保存的自定义来源覆盖");
+        Check((await PluginHost.CheckResourcesAsync(textures, root, once)).Download == once,
+            "贴图本次来源同样优先于保存的默认来源");
         try { await PluginHost.CheckResourcesAsync(package, root, root); throw new Exception("错误接受文件夹"); }
         catch (InvalidDataException error) { Check(error.Message.Contains("文件夹"), "文件夹必须得到明确错误"); }
         try { await PluginHost.CheckResourcesAsync(package, root, Path.Combine(root, "missing.zip")); throw new Exception("错误接受不存在文件"); }

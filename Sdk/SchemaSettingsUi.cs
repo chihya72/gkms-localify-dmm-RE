@@ -63,7 +63,8 @@ public class SchemaSettingsUi : IPluginSettingsUi
                 catch (Exception error) { sectionMessage = error.Message; }
             }
         }
-        ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
+        ImGui.Spacing();
+        if (!resources) { ImGui.Separator(); ImGui.Spacing(); }
         if (ImGui.Button(L("保存配置", "Save settings")))
         {
             try
@@ -89,7 +90,7 @@ public class SchemaSettingsUi : IPluginSettingsUi
             }
             catch (Exception error) { sectionMessage = error.GetBaseException().Message; }
         }
-        if (Context.CanReloadResources && (resources || !Context.Fields.Any(f => f.Section == "resources")))
+        if (Context.CanReloadResources && !resources && !Context.Fields.Any(f => f.Section == "resources"))
         {
             ImGui.SameLine(); ImGui.BeginDisabled(reloading);
             if (ImGui.Button(L("重载资源", "Reload resources"))) { reloading = true; _ = Reload(resources); }

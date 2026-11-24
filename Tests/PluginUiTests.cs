@@ -34,6 +34,19 @@ internal static class PluginUiTests
                     _ => Task.FromResult("offline"), log.Add);
                 session.OpenConfigUi();
                 for (var frame = 0; frame < 2; frame++) Check(canvas.Frame(session, true), package.Manifest.Id + ": ImGui 绘制失败");
+                if (package.Manifest.Id is "localization" or "textures")
+                {
+                    var expected = package.Manifest.Id == "localization"
+                        ? "https://uma.chinosk6.cn/api/gkms_trans_data"
+                        : "https://texture.gakumas.cn/api/gkms_texture_data";
+                    Check(session.Services.Fields.Single(field => field.Key == "updateSource").Default.GetString() == expected,
+                        "资源地址输入框的默认值必须是 DMM 原版地址");
+                    var rendered = Path.Combine(root, package.Manifest.Id + "-resource-ui.txt");
+                    Check(canvas.Frame(session, true, rendered), "资源更新设置绘制成功");
+                    var text = File.ReadAllText(rendered).Replace("\r", "").Replace("\n", "");
+                    Check(text.Contains("原版默认地址") && text.Contains(expected), "资源设置必须实际绘制完整默认地址");
+                    Check(state.GetRawText() == "{}", "查看默认地址不能悄悄写入或覆盖设置");
+                }
                 if (!package.Manifest.HasSettingsUi) Check(canvas.ContentVertices == 0, package.Manifest.Id + ": 不应绘制空配置、重复说明或 JSON 编辑器");
                 if (package.Manifest.Id == "textures")
                 {
@@ -178,11 +191,12 @@ internal static class PluginUiTests
             ImGui.Render(); ImGuiAppearance.Configure(); renderer.RecreateFontDeviceTexture(device);
             Check(ImGui.GetIO().Fonts.Fonts[0].FindGlyphNoFallback('译').NativePtr != null, "中文字体未构建");
         }
-        public bool Frame(SettingsUiSession session, bool showResources = false)
+        public bool Frame(SettingsUiSession session, bool showResources = false, string? logFile = null)
         {
             ImGui.SetCurrentContext(context); renderer.Begin();
             ImGui.SetNextWindowPos(Vector2.Zero); ImGui.SetNextWindowSize(new Vector2(900, 760));
             ImGui.Begin("Settings", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings);
+            if (logFile != null) ImGui.LogToFile(-1, logFile);
             var before = ImGui.GetWindowDrawList().VtxBuffer.Size;
             if (!session.DrawFrame()) return false;
             if (showResources)
@@ -193,6 +207,7 @@ internal static class PluginUiTests
             }
             LastItemTop = ImGui.GetItemRectMin().Y;
             ContentVertices = ImGui.GetWindowDrawList().VtxBuffer.Size - before;
+            if (logFile != null) ImGui.LogFinish();
             ImGui.End();
             commands.Begin(); commands.SetFramebuffer(target); commands.ClearColorTarget(0, RgbaFloat.Black);
             renderer.Render(device, commands); commands.End(); device.SubmitCommands(commands);

@@ -287,8 +287,18 @@ internal static class MigrationTests
             UnityEngine.Screen.SetResolution(900, 1440, false); window.ApplyOrientationSettings(1); window.ApplyOrientationSettings(1);
             Check(UnityEngine.Screen.width == 900 && UnityEngine.Screen.height == 1440 && window.Calls == 0, "原版每次切换后记住该次输入尺寸，下次使用该值");
             Check(handle.SetWindowLong(-4, new IntPtr(5)) == IntPtr.Zero && handle.Calls == 0 && handle.SetWindowLong(-16, new IntPtr(6)) == new IntPtr(6), "只拦截窗口过程恢复");
+            File.WriteAllText(profile, """{"enabled":["window"],"settings":{"window":{"resizable":false}}}"""); host.ReloadProfile();
+            var calls = handle.Calls;
+            Check(handle.SetWindowLong(-4, new IntPtr(7)) == new IntPtr(7) && handle.Calls == calls + 1,
+                "关闭自由缩放后，按 DMM 原版透传游戏窗口过程设置");
+            window.ApplyOrientationSettings(0);
+            Check(window.Calls == 1, "关闭自由缩放后透传游戏方向尺寸处理");
+            File.WriteAllText(profile, """{"enabled":["window"],"settings":{"window":{"resizable":true}}}"""); host.ReloadProfile();
+            calls = handle.Calls;
+            Check(handle.SetWindowLong(-4, new IntPtr(8)) == IntPtr.Zero && handle.Calls == calls,
+                "重新开启自由缩放后恢复原版窗口过程拦截");
         }
-        window.ApplyOrientationSettings(0); Check(window.Calls == 1, "关闭窗口插件恢复游戏处理");
+        window.ApplyOrientationSettings(0); Check(window.Calls == 2, "关闭窗口插件恢复游戏处理");
     }
 
     private static void Capture(string data, string packages)

@@ -230,7 +230,7 @@ internal sealed class OverlayPanel : IDisposable
                 ImGui.BeginDisabled(busy);
                 if(session!=null && !session.DrawResourceSettings()) throw new InvalidOperationException(session.Fault);
                 ImGui.EndDisabled();
-                ImGui.Spacing();
+                ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
                 resources.Draw(); ImGui.PopID();
             }
             ImGui.EndTabItem();
