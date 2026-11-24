@@ -12,6 +12,7 @@ internal static class LegacyProfile
         bool Flag(string key, bool fallback = false) => (bool?)config[key] ?? fallback;
         int Number(string key) => (int?)config[key] ?? 0;
         var enabled = Flag("enabled", true);
+        var cameraId = packages.ContainsKey("camera-control") ? "camera-control" : "camera";
         var flags = new Dictionary<string, bool>
         {
             ["localization"] = true,
@@ -20,7 +21,7 @@ internal static class LegacyProfile
             ["ios-login"] = Flag("loginAsIOS"),
             ["live-unlock"] = Flag("dbgMode") && (Flag("unlockAllLive") || Flag("unlockAllLiveCostume")),
             ["graphics"] = Flag("useCustomeGraphicSettings"), ["window"] = Number("gameOrientation") != 0 || Flag("dmmUnlockSize"),
-            ["camera"] = Flag("enableFreeCamera"), ["gyro"] = Flag("enableGyroEmu"), ["physics"] = Flag("enableBreastParam"),
+            [cameraId] = Flag("enableFreeCamera"), ["gyro"] = Flag("enableGyroEmu"), ["physics"] = Flag("enableBreastParam"),
             ["capture"] = Flag("dumpText") || Flag("dumpRuntimeTexture"),
             ["auto-photo"] = Flag("dbgMode")
         };

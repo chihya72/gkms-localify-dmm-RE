@@ -139,13 +139,13 @@ internal static unsafe class OverlayTests
             Check(Function<Resize>("fixture_overlay_resize")(900,720)==0,"ResizeBuffers releases overlay references");
             toggle(); Check(frame()==0 && overlay.Visible,"render after resizing");
             var changed = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(profile))!.AsObject();
-            changed["enabled"] = new System.Text.Json.Nodes.JsonArray("camera");
+            changed["enabled"] = new System.Text.Json.Nodes.JsonArray("camera-control");
             File.WriteAllText(profile, changed.ToJsonString());
             Thread.Sleep(1100); Check(frame()==0, "external profile poll frame");
             const System.Reflection.BindingFlags privateFields = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             var currentPanel = typeof(GameOverlay).GetField("panel", privateFields)!.GetValue(overlay)!;
             var selection = (HashSet<string>)currentPanel.GetType().GetField("enabled", privateFields)!.GetValue(currentPanel)!;
-            Check(selection.SetEquals(new[] { "camera" }), "external CLI/profile changes synchronize checkbox selection without a manual refresh");
+            Check(selection.SetEquals(new[] { "camera-control" }), "external CLI/profile changes synchronize checkbox selection without a manual refresh");
             Check(!messages.Any(m=>m.StartsWith("overlay:")),"overlay exception boundary: "+string.Join("\n",messages));
         }
         Function<Action>("fixture_overlay_destroy")();

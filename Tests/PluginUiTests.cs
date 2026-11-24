@@ -68,6 +68,23 @@ internal static class PluginUiTests
             Check(written.TryGetProperty("textTest", out _) && !written.TryGetProperty("updateSource", out _) && state.GetProperty("updateSource").GetString() == "new.zip",
                 "普通参数保存不得覆盖资源更新设置");
         }
+        foreach (var orientation in new[] { "game", "portrait", "landscape" })
+        using (var canvas = new Canvas())
+        {
+            var state = JsonSerializer.SerializeToElement(new { orientation, resizable = false, keep = 42 });
+            JsonElement written = default;
+            using var session = new SettingsUiSession(catalog["window"], "zh-CN", () => state,
+                (value, _) => written = value, _ => Task.FromResult("offline"), log.Add);
+            session.OpenConfigUi(); canvas.Frame(session); canvas.Frame(session);
+            var save = new Vector2(40, canvas.LastItemTop + 10);
+            var io = ImGui.GetIO();
+            io.AddMousePosEvent(save.X, save.Y); canvas.Frame(session);
+            io.AddMouseButtonEvent(0, true); canvas.Frame(session);
+            io.AddMouseButtonEvent(0, false); canvas.Frame(session);
+            Check(written.ValueKind == JsonValueKind.Object && written.GetProperty("orientation").GetString() == orientation &&
+                !written.GetProperty("resizable").GetBoolean() && !written.TryGetProperty("keep", out _),
+                "中文窗口选项保存原配置值，仅合并本插件两项设置：" + orientation);
+        }
         var sample = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "example", "net6.0"));
         var m = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(Path.Combine(sample, "plugin.json")), Catalog.Json)!;
         var normal = new Package(sample, m);

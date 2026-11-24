@@ -1,5 +1,16 @@
 using System.Runtime.CompilerServices;
 
+namespace Campus.Common
+{
+    public enum WindowOrientationFixture { Game = 0, Portrait = 2, Landscape = 3 }
+    public class ScreenOrientationControllerBase
+    {
+        public WindowOrientationFixture LastOrientation;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void InternalSetOrientationAsync(WindowOrientationFixture orientation, bool animate, CancellationToken token) => LastOrientation = orientation;
+    }
+}
+
 namespace Campus.Common.Proto.Client.Master
 {
     public sealed class LateMaster : Google.Protobuf.IMessage

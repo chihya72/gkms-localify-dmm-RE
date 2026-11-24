@@ -66,6 +66,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           name: framework-release
@@ -75,7 +78,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $assets = @(Get-ChildItem -LiteralPath (Join-Path $PWD 'artifacts') -Recurse -File | ForEach-Object FullName)
-          [string[]]$arguments = @('release', 'create', $env:GITHUB_REF_NAME, '--repo', $env:GITHUB_REPOSITORY, '--verify-tag', '--draft', '--title', "RE $env:GITHUB_REF_NAME", '--generate-notes') + $assets
+          $notes = Join-Path $PWD 'RELEASE_NOTES.md'
+          [string[]]$arguments = @('release', 'create', $env:GITHUB_REF_NAME, '--repo', $env:GITHUB_REPOSITORY, '--verify-tag', '--draft', '--title', "RE $env:GITHUB_REF_NAME", '--notes-file', $notes) + $assets
           & gh @arguments
           if ($LASTEXITCODE -ne 0) { throw 'Draft release upload failed' }
           [string[]]$arguments = @('release', 'edit', $env:GITHUB_REF_NAME, '--repo', $env:GITHUB_REPOSITORY, '--draft=false')

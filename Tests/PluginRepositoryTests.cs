@@ -14,6 +14,28 @@ internal static class PluginRepositoryTests
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFileW(string name, uint access, uint share, nint attributes, uint disposition, uint flags, nint template);
     public static void Run(string work, string packages) => RunAsync(work, packages).GetAwaiter().GetResult();
+    public static async Task VerifySourceAsync(string url, string work)
+    {
+        var root = Path.Combine(work, "subscription-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        PluginRepositoryStore.Enable(root, "official", false);
+        PluginRepositoryStore.Add(root, "Local source test", url);
+        var service = new PluginRepositoryService(root);
+        var result = (await service.RefreshAsync()).Single();
+        Check(result.Error == null && result.Plugins.Length > 0, "source index: " + result.Error);
+        foreach (var offer in result.Plugins)
+        {
+            var package = await service.InstallAsync(offer, false);
+            Check(package.Manifest.Id == offer.Plugin.Id && package.Manifest.Version == offer.Plugin.Version &&
+                package.Manifest.Name == offer.Plugin.Name && package.Manifest.Author == offer.Plugin.Author &&
+                package.Manifest.Description == offer.Plugin.Description &&
+                File.Exists(Path.Combine(package.Directory, package.Manifest.Assembly)), "source metadata and installation: " + offer.Plugin.Id);
+            Check(PluginRepositoryStore.Owns(PluginRepositoryStore.Read(root), offer.Plugin.Id, result.Source), "subscription ownership");
+            Console.WriteLine($"Source install PASS: {offer.Plugin.Id} {offer.Plugin.Version}");
+        }
+        Check(Catalog.ReadProfile(Path.Combine(root, "profile.json")).Enabled.Length == 0, "installed plugins remain disabled");
+        Console.WriteLine($"Source PASS: {result.Plugins.Length} packages installed from {url}; artifacts: {root}");
+    }
     public static async Task VerifyPublishedAsync(string work)
     {
         var root = Path.Combine(work, "published-" + Guid.NewGuid().ToString("N"));

@@ -6,6 +6,11 @@ using Gkms.Plugins.Localization;
 using HarmonyLib;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+if (args.Length == 3 && args[0] == "--repository-source")
+{
+    PluginRepositoryTests.VerifySourceAsync(args[1], args[2]).GetAwaiter().GetResult();
+    return 0;
+}
 if (args.Length == 2 && args[0] == "--published-repository")
 {
     PluginRepositoryTests.VerifyPublishedAsync(args[1]).GetAwaiter().GetResult();
@@ -471,7 +476,7 @@ static void VerifyPanelServices(string work, string distribution)
     var pluginDir = Path.Combine(root, "plugins");
     var onlyOld = new Dictionary<string, Package>();
     foreach (var (id, assembly) in new[] { ("i18n", "I18n"), ("master", "Master"), ("lyrics", "Lyrics"),
-        ("texture-capture", "TextureCapture"), ("settings-panel", "SettingsPanel"), ("unity-log", "UnityLog"), ("purchase-guard", "PurchaseGuard") })
+        ("texture-capture", "TextureCapture"), ("settings-panel", "SettingsPanel"), ("unity-log", "UnityLog"), ("purchase-guard", "PurchaseGuard"), ("camera", "Camera") })
     {
         var former = Directory.CreateDirectory(Path.Combine(pluginDir, "obsolete-" + id)).FullName;
         var manifest = new Manifest(id, id, Catalog.ApiVersion, $"Gkms.{assembly}.dll", $"Gkms.Plugins.{assembly}.Plugin")
@@ -482,6 +487,17 @@ static void VerifyPanelServices(string work, string distribution)
     var current = Catalog.Discover(pluginDir, _ => {});
     Check(current.ContainsKey("localization") && current.ContainsKey("ios-login") && !onlyOld.Keys.Any(current.ContainsKey), "覆盖安装时不显示已合并或内置的旧包");
     var fileName = Path.Combine(root, "profile.json");
+    File.WriteAllText(fileName, """{"enabled":["camera","camera-control"],"settings":{"camera":{"speed":5,"sensitivity":2},"camera-control":{"speed":7}}}""");
+    var renamedCamera = Catalog.ReadProfile(fileName, current);
+    Check(renamedCamera.Enabled.SequenceEqual(new[] { "camera-control" }) &&
+        renamedCamera.Settings!["camera-control"].GetProperty("speed").GetInt32() == 7 &&
+        renamedCamera.Settings["camera-control"].GetProperty("sensitivity").GetInt32() == 2 &&
+        renamedCamera.Settings["camera"].GetProperty("speed").GetInt32() == 5,
+        "镜头 ID 迁移去重并保留参数，新 ID 参数优先且旧数据可恢复");
+    Check(Catalog.ReadProfile(fileName, onlyOld).Enabled.Contains("camera") &&
+        Catalog.ReadProfile(fileName, onlyOld).Settings!["camera-control"].GetProperty("speed").GetInt32() == 7,
+        "仅安装旧镜头包时保留旧 ID 及两个 ID 的独立配置");
+    Check(Catalog.ReadProfile(fileName).Enabled.Contains("camera"), "尚未检查已安装包时不得预先迁移镜头 ID");
     File.WriteAllText(fileName, """{"enabled":["texture-capture","settings-panel","capture","unity-log"]}""");
     Check(Catalog.ReadProfile(fileName, current).Enabled.SequenceEqual(new[] { "capture" }), "旧采集和内置功能迁移");
     File.WriteAllText(fileName, """{"enabled":["font"]}""");
@@ -506,10 +522,10 @@ static void VerifyPanelServices(string work, string distribution)
         """{"enabled":true,"targetFrameRate":120,"replaceFont":false,"dumpRuntimeTexture":true,"enableFreeCamera":true,"loginAsIOS":true,"dbgMode":true,"unlockAllLive":true,"unlockAllLiveCostume":false}""");
     Check(Attempt(() => Gkms.Manager.LegacyProfile.Import(root, current)) == 0, "旧版选项导入");
     var imported = Catalog.ReadProfile(fileName);
-    Check(imported.Enabled.Contains("camera") && imported.Enabled.Contains("frame-rate") && imported.Enabled.Contains("ios-login") &&
+    Check(imported.Enabled.Contains("camera-control") && imported.Enabled.Contains("frame-rate") && imported.Enabled.Contains("ios-login") &&
         imported.Enabled.Contains("localization") && imported.Enabled.Contains("capture") && !imported.Settings!["localization"].TryGetProperty("font", out _) &&
         imported.Settings!["frame-rate"].GetProperty("fps").GetInt32() == 120 &&
-        imported.Settings["camera"].GetProperty("speed").GetInt32() == 5 &&
+        imported.Settings["camera-control"].GetProperty("speed").GetInt32() == 5 &&
         imported.Settings["live-unlock"].GetProperty("live").GetBoolean() && !imported.Settings["live-unlock"].GetProperty("costumes").GetBoolean() &&
         imported.Settings["capture"].GetProperty("textures").GetBoolean() && !imported.Settings["capture"].GetProperty("text").GetBoolean(), "旧版参数与独立子开关迁移");
 

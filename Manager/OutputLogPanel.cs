@@ -6,7 +6,7 @@ using ImGuiNET;
 
 namespace Gkms.Manager;
 
-internal sealed record OutputLogEntry(PluginLogLevel? Level, string Text);
+internal sealed record OutputLogEntry(PluginLogLevel? Level, string Text, string Source = "");
 
 internal sealed class OutputLogBuffer
 {
@@ -31,12 +31,22 @@ internal sealed class OutputLogBuffer
                 var previous = Entries[^1];
                 if (previous.Text.Length < 32768) Entries[^1] = previous with { Text = previous.Text + "\n" + line };
             }
-            else Entries.Add(new(level, line.Length > 32768 ? line[..32768] : line));
+            else Entries.Add(new(level, line.Length > 32768 ? line[..32768] : line, ReadSource(message, level)));
         }
         if (Entries.Count > Limit) Entries.RemoveRange(0, Entries.Count - Limit);
     }
-    internal IEnumerable<OutputLogEntry> Filter(bool[] levels, string query) => Entries.Where(entry =>
+    private static string ReadSource(string message, PluginLogLevel? level)
+    {
+        var body = level.HasValue ? message[(level.ToString()!.Length + 3)..] : message;
+        var end = body.IndexOf(": ", StringComparison.Ordinal);
+        if (end <= 0) return "";
+        var source = body[..end];
+        return source.All(c => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '.' or '_' or '-') ? source : "";
+    }
+    internal IEnumerable<string> Sources => Entries.Select(entry => entry.Source).Distinct().OrderBy(source => source, StringComparer.Ordinal);
+    internal IEnumerable<OutputLogEntry> Filter(bool[] levels, string query, string? source = null) => Entries.Where(entry =>
         levels[entry.Level.HasValue ? (int)entry.Level.Value : 5] &&
+        (source == null || entry.Source == source) &&
         (string.IsNullOrWhiteSpace(query) || entry.Text.Contains(query, StringComparison.OrdinalIgnoreCase)));
 }
 
@@ -52,6 +62,7 @@ internal sealed class OutputLogPanel
     private long position;
     private DateTime nextRead, creation;
     private string search = "", error = "";
+    private string? source;
     internal OutputLogPanel(string root) => file = Path.Combine(root, "runtime.log");
     internal void Open() { visible = true; nextRead = default; }
     private void Read()
@@ -102,9 +113,18 @@ internal sealed class OutputLogPanel
                 if (i > 0) ImGuiAppearance.SameLineIfFits(ImGui.CalcTextSize(labels[i]).X + ImGui.GetFrameHeight() + ImGui.GetStyle().ItemInnerSpacing.X);
                 ImGui.Checkbox(labels[i], ref levels[i]);
             }
+            ImGui.SetNextItemWidth(-1);
+            string SourceLabel(string value) => value.Length == 0 ? "框架 / 未标注来源" : value == "framework" ? "框架（framework）" : value;
+            if (ImGui.BeginCombo("##log-source", source == null ? "全部插件 / 来源" : SourceLabel(source)))
+            {
+                if (ImGui.Selectable("全部插件 / 来源", source == null)) source = null;
+                foreach (var item in buffer.Sources.Concat(source == null ? Array.Empty<string>() : new[] { source }).Distinct().OrderBy(item => item, StringComparer.Ordinal))
+                    if (ImGui.Selectable(SourceLabel(item), source == item)) source = item;
+                ImGui.EndCombo();
+            }
             ImGui.SetNextItemWidth(-1); ImGui.InputTextWithHint("##log-search", "搜索日志内容", ref search, 512);
             ImGui.Checkbox("暂停刷新", ref paused); ImGui.SameLine(); ImGui.Checkbox("跟随最新", ref follow);
-            var entries = buffer.Filter(levels, search).ToArray();
+            var entries = buffer.Filter(levels, search, source).ToArray();
             if (ImGui.Button("复制筛选结果")) ImGui.SetClipboardText(string.Join("\n", entries.Select(entry => entry.Text)));
             ImGui.SameLine(); ImGui.TextDisabled($"{entries.Length} / {buffer.Entries.Count} 条（最近 {OutputLogBuffer.Limit} 条）");
             if (error.Length > 0) PluginUiText.Wrapped(error);

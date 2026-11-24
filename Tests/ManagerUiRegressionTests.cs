@@ -57,6 +57,14 @@ internal static unsafe class ManagerUiRegressionTests
         Check(buffer.Filter(levels, "at Plugin").Single().Level == PluginLogLevel.Error, "stack trace inherits severity");
         Check(buffer.Filter(levels, "兼容性").Single().Level == PluginLogLevel.Warning, "split reads retain complete Chinese messages");
         Check(buffer.Entries[^1].Level == null, "legacy messages remain unclassified");
+        var scoped = new OutputLogBuffer();
+        scoped.Append("[2026-11-23 10:00:00.000] [Error] window: failed\n  at Window.Start()\n[Info] gkms.dlss5: window: renderer ready\n[Warning] window-extra: warning\n[Info] framework: ready\n[Info] unscoped message\n");
+        var all = new[] { true, true, true, true, true, true };
+        Check(scoped.Filter(all, "", "window").Single().Text.Contains("at Window.Start()"), "plugin source is exact and stack traces inherit source");
+        Check(scoped.Filter(all, "window", "gkms.dlss5").Count() == 1, "source and text filters intersect without parsing message content as source");
+        Check(!scoped.Filter(levels, "", "gkms.dlss5").Any(), "source and severity filters intersect");
+        Check(scoped.Filter(all, "", "").Count() == 1 && scoped.Filter(all, "", "framework").Count() == 1, "framework and unscoped logs remain accessible");
+        scoped.Reset(); Check(!scoped.Sources.Any(), "rotation clears source inventory");
         foreach (var level in Enum.GetValues<PluginLogLevel>())
         {
             var message = PluginLog.Normalize(PluginLog.WithSource($"[{level}] 内容", "example.plugin"));
