@@ -16,6 +16,10 @@ namespace Campus.Common.Proto.Client.Api
         public int PaidBalance { get; set; }
         public int WebStorePaidBalance { get; set; }
     }
+    public sealed class HomeLoginResponse : Google.Protobuf.IMessage
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)] public void InternalMergeFrom() { }
+    }
 }
 namespace Firebase.Platform
 {
@@ -27,8 +31,17 @@ namespace Firebase.Platform
 }
 namespace Qua.Network
 {
-    public interface IApiError { }
-    public sealed class ApiError : IApiError { }
+    public interface IApiError { string Code { get; } string Action { get; } }
+    public sealed class ApiError : IApiError { public string Code { get; set; } = ""; public string Action { get; set; } = ""; }
+    public sealed class ApiCallOption(bool disableApiErrorHandler, bool disableOnWillExecute, bool disableOnDidComplete,
+        bool disableOnStartApi, bool disableOnEndApi)
+    {
+        public bool DisableApiErrorHandler { get; } = disableApiErrorHandler;
+        public bool DisableOnWillExecute { get; } = disableOnWillExecute;
+        public bool DisableOnDidComplete { get; } = disableOnDidComplete;
+        public bool DisableOnStartApi { get; } = disableOnStartApi;
+        public bool DisableOnEndApi { get; } = disableOnEndApi;
+    }
     public interface IApiRequest<TRequest,TResponse>
     {
         bool IsDone { get; }
@@ -69,6 +82,13 @@ namespace Campus.Common.Network
                 public readonly TaskCompletionSource<Qua.Network.IApiRequest<Google.Protobuf.WellKnownTypes.Empty,UserGetBalanceResponse>> Completion = new();
                 public readonly List<KeyValuePair<string, string>> Headers = new();
                 public CancellationToken Token;
+                public Qua.Network.ApiCallOption? Options;
+                public void RejectDateChanged()
+                {
+                    if (Options?.DisableApiErrorHandler != true) TitleTransitions++;
+                    Completion.TrySetResult(new Qua.Network.ApiRequest<Google.Protobuf.WellKnownTypes.Empty,UserGetBalanceResponse> {
+                        IsDone = true, Error = new Qua.Network.ApiError { Code = "2006", Action = "title" } });
+                }
                 public void Complete(int free, int paid, int web = 0, bool logHeaders = true, bool isDone = true, bool error = false, bool noResponse = false)
                 {
                     var response = new UserGetBalanceResponse { FreeBalance = free, PaidBalance = paid, WebStorePaidBalance = web };
@@ -78,12 +98,16 @@ namespace Campus.Common.Network
                 }
             }
             public static readonly List<Pending> Requests = new();
+            public static int TitleTransitions;
+            public static int LoadingEvents;
             [MethodImpl(MethodImplOptions.NoInlining)]
             public static Cysharp.Threading.Tasks.UniTask<Qua.Network.IApiRequest<Google.Protobuf.WellKnownTypes.Empty,UserGetBalanceResponse>> GetBalanceAsync(CancellationToken? ct,
-                object? callOption, object? errorHandler, string? requestIdForResponseCache)
+                Qua.Network.ApiCallOption? callOption, object? errorHandler, string? requestIdForResponseCache)
             {
                 if (requestIdForResponseCache != null) throw new Exception("余额刷新不可使用旧响应缓存");
-                var pending = new Pending { Token = ct ?? default };
+                var pending = new Pending { Token = ct ?? default, Options = callOption };
+                if (callOption?.DisableOnWillExecute != true || callOption.DisableOnDidComplete != true ||
+                    callOption.DisableOnStartApi != true || callOption.DisableOnEndApi != true) LoadingEvents++;
                 pending.Headers.Add(new(Instance.PlatformHeaderKey, Instance._platform));
                 pending.Headers.Add(new("authorization", Instance._authToken));
                 pending.Token.Register(() => pending.Completion.TrySetCanceled());

@@ -14,6 +14,8 @@ internal static class IosLoginTests
         var quality = new Campus.Common.CampusQualityManager();
         var logs = new List<string>();
         void Profile(bool enabled) => File.WriteAllText(profile, enabled ? "{\"enabled\":[\"ios-login\"]}" : "{\"enabled\":[]}");
+        void HomeLoggedIn() => api.ApiSuccessLog("Home:Login", new object(), Array.Empty<object>(),
+            new HomeLoginResponse(), Array.Empty<object>(), 1);
         Api.SetAuthToken(""); api._platform = "DMM"; api.Initialize(); Api.User.Requests.Clear();
         user.Reset(null); Profile(true);
         var game = new TestGame();
@@ -34,6 +36,10 @@ internal static class IosLoginTests
         var recreated = new Api(); Check(recreated._platform == "iOS", "认证后的新 API 实例也必须沿用 iOS 平台");
         quality.Update(); Check(Api.User.Requests.Count == 0, "等待初始用户数据，避免刷新被初始化覆盖");
         user.Reset(new() { PaidBalance = 11 }); quality.Update();
+        Check(Api.User.Requests.Count == 0, "跨日首次登录：User:Get 已有余额也不能抢在 Home:Login 前查询余额");
+        new HomeLoginResponse().Read(); quality.Update();
+        Check(Api.User.Requests.Count == 0, "Home:Login 仅解析响应不算请求成功");
+        HomeLoggedIn(); quality.Update();
         var first = Api.User.Requests.Last();
         Check(!host.GetWarnings().ContainsKey("ios-login"), "余额请求过程中不显示开发诊断状态");
         Check(first.Headers[0].Value == "iOS", "实际发送的请求头使用 iOS");
@@ -43,6 +49,8 @@ internal static class IosLoginTests
         Check(!host.GetWarnings().ContainsKey("ios-login") && logs.Any(l => l.Contains("iOS 余额确认成功")), "收到且应用余额后才能报告成功");
         Check(!logs.Any(l => l.Contains("secret-do-not-log")), "平台和余额日志不得泄露认证令牌");
         quality.Update(); Check(Api.User.Requests.Count == 1, "每次启用仅刷新一次，不逐帧请求");
+        HomeLoggedIn(); quality.Update();
+        Check(Api.User.Requests.Count == 1, "重复登录完成通知不能重复刷新");
 
         void Reload() { Profile(false); host.ReloadProfile(); Profile(true); host.ReloadProfile(); quality.Update(); }
         Reload(); var wrong = Api.User.Requests.Last(); wrong.Headers[0] = new(api.PlatformHeaderKey, "DMM");
@@ -56,6 +64,10 @@ internal static class IosLoginTests
         Check(user.DisplayedPaid == 600 && host.GetWarnings().ContainsKey("ios-login"), "没有实际请求头证据时不得把缓存或未观察的响应当作验证成功");
         Reload(); Api.User.Requests.Last().Completion.SetException(new IOException("模拟通信错误")); quality.Update();
         Check(user.DisplayedPaid == 600 && host.GetWarnings().ContainsKey("ios-login"), "请求失败保留原余额并报告未确认");
+        Reload(); Api.User.Requests.Last().RejectDateChanged(); quality.Update();
+        Check(Api.User.TitleTransitions == 0 && Api.User.LoadingEvents == 0 && user.DisplayedPaid == 600,
+            "后台刷新遇到 DateChanged/title 不得触发返回标题、游戏加载事件或覆盖余额");
+        Check(host.GetWarnings().ContainsKey("ios-login") && logs.Any(l => l.Contains("2006")), "后台服务端错误必须保留具体错误码");
         Reload(); Api.User.Requests.Last().Complete(0, 0); quality.Update();
         Check(user.DisplayedPaid == 0 && !host.GetWarnings().ContainsKey("ios-login"), "合法零余额也必须应用");
         Check(host.GetStates()["ios-login"].State == PluginRunState.Running, "成功重试清除失败状态");
@@ -64,7 +76,9 @@ internal static class IosLoginTests
         Check(cancelled.Token.IsCancellationRequested && api._platform == "DMM", "重新认证取消旧请求并恢复 DMM");
         Api.SetAuthToken("secret-next-login"); quality.Update();
         Check(Api.User.Requests.Last() == cancelled && api._platform == "DMM", "写入令牌本身不能代替原版的完整认证响应");
-        new AuthLoginResponse { GameAuthToken = "secret-next-login" }.Read(); quality.Update(); var next = Api.User.Requests.Last();
+        new AuthLoginResponse { GameAuthToken = "secret-next-login" }.Read(); quality.Update();
+        Check(Api.User.Requests.Last() == cancelled, "重登不能复用上次 Home:Login 已完成的状态");
+        HomeLoggedIn(); quality.Update(); var next = Api.User.Requests.Last();
         cancelled.Complete(99, 999); quality.Update();
         Check(user.Notifications == notified, "上一登录会话的迟到响应不能改写当前余额");
         next.Complete(3, 4); quality.Update(); Check(user.DisplayedPaid == 4, "新认证完成后刷新新会话余额");
@@ -111,8 +125,9 @@ internal static class IosLoginTests
         Check(user.DisplayedPaid == 70, "快速开关后只应用最新启用请求");
 
         Profile(false); host.ReloadProfile(); host.Pump(); var stopError = Api.User.Requests.Last();
-        stopError.Completion.SetException(new IOException("DMM 刷新通信失败")); host.Pump();
+        stopError.RejectDateChanged(); host.Pump();
         Check(user.DisplayedPaid == 70 && host.GetWarnings().ContainsKey("ios-login"), "关闭后的通信失败也必须可见且不得清空余额");
+        Check(Api.User.TitleTransitions == 0 && Api.User.LoadingEvents == 0, "停用后的 DMM 后台刷新同样不能触发游戏标题跳转或加载事件");
         Reload(); Api.User.Requests.Last().Complete(60, 70); quality.Update();
         Profile(false); host.ReloadProfile(); host.Pump(); var stopLogin = Api.User.Requests.Last();
         _ = new AuthLoginRequest(); host.Pump();
@@ -121,6 +136,6 @@ internal static class IosLoginTests
         host.Dispose();
         Check(stopShutdown.Token.IsCancellationRequested && game.Live == 0, "宿主关闭取消停用收尾并移除全部临时 Hook");
         Api.SetAuthToken(""); user.Reset(new());
-        Console.WriteLine("iOS 登录专项通过：实机 IApiRequest 返回结构、双向余额刷新、失败保留、并发更新防覆盖、快速开关、重登/关机取消、平台头与令牌脱敏。");
+        Console.WriteLine("iOS 登录专项通过：Home:Login 后刷新、跨日错误不跳标题、双向余额刷新、失败保留、并发更新防覆盖、快速开关、重登/关机取消、平台头与令牌脱敏（离线模拟）。");
     }
 }

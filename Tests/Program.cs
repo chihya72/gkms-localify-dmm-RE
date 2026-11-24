@@ -79,6 +79,11 @@ if (args[0] == "--ios-login")
     IosLoginTests.Run(args[2], args[1]);
     return 0;
 }
+if (args[0] == "--capture-text")
+{
+    CaptureTextTests.Run(args[2], args[1]);
+    return 0;
+}
 
 if (args[0] != "--suite")
 {
@@ -110,6 +115,7 @@ IosLoginTests.Run(work, packages);
 VerifyCameraPhysics(work, packages);
 VerifyDisplayOptions(work, packages);
 VerifyFrameworkAndCapture(work, packages);
+PluginApiTests.RunIsolated(work, packages, "--capture-text");
 PluginApiTests.RunIsolated(work, packages, "--dmm-parity");
 PluginApiTests.RunIsolated(work, packages, "--text-startup");
 PluginApiTests.RunIsolated(work, packages, "--migration");
@@ -414,7 +420,6 @@ static void VerifyFrameworkAndCapture(string work, string packages)
     var quality = new Campus.Common.CampusQualityManager();
     var texture = new UnityEngine.Texture2D(8, 8) { name = "atlas" };
     var output = Path.Combine(Catalog.Discover(packages, _ => { })["capture"].Directory, "output");
-    var textFile = Path.Combine(output, "observed.jsonl");
     using (var host = new PluginHost(game, log.Add))
     {
         host.Start(packages, profile, data);
@@ -437,10 +442,10 @@ static void VerifyFrameworkAndCapture(string work, string packages)
     UnityEngine.Input.U = true; quality.Update();
     UnityEngine.DebugLogHandler.Internal_Log(0, 0, "after-dispose", null);
     tmp.text = "已卸载"; canvas.SetTexture(new UnityEngine.Texture2D(8, 8) { name = "after" });
-    var lines = File.ReadAllLines(textFile);
-    using var capture = JsonDocument.Parse("[" + string.Join(",", lines) + "]");
-    var values = capture.RootElement.EnumerateArray().Select(row => row.GetProperty("value").GetString()).ToArray();
-    Check(game.Live == 0 && !log.Any(line => line.Contains("after-dispose")) && values.SequenceEqual(new[] { "原文", "台词" }) &&
+    var keyed = Gkms.Sdk.Interop.ReadDictionary(Path.Combine(output, "localization.json"));
+    var originals = Gkms.Sdk.Interop.ReadDictionary(Path.Combine(output, "generic_orig.json"));
+    Check(game.Live == 0 && !log.Any(line => line.Contains("after-dispose")) && keyed["menu"] == "原文" &&
+          originals.ContainsKey("台词") && !originals.ContainsKey("已卸载") &&
           !File.Exists(Path.Combine(output, "texture2d", "others", "after.png")), "卸载时释放宿主和采集回调");
     UnityEngine.Input.U = false;
 }
