@@ -252,6 +252,39 @@ internal static class PluginRepositoryTests
         await service.InstallAsync(offer, false);
         installed = Catalog.Discover(Path.Combine(root, "plugins"), _ => { })[manifest.Id];
         Check(File.Exists(Path.Combine(installed.Directory, "resources", "local.txt")) && File.ReadAllText(Path.Combine(installed.Directory, "resources", "default.txt")) == "用户修改默认资源" && !Catalog.ReadProfile(Path.Combine(root, "profile.json")).Enabled.Contains(manifest.Id), "uninstall/reinstall restores resources including edits to package defaults and leaves plugin disabled");
+
+        Publish("1.3.0", flat: true);
+        var stale = (await service.RefreshAsync()).Single(r => r.Source.Id == source.Id).Plugins.Single();
+        Publish("1.5.0", flat: true);
+        installed = await service.InstallAsync(stale, true);
+        Check(installed.Manifest.Version == "1.5.0", "single update refreshes a stale offer and skips intermediate versions");
+        Check(File.ReadAllText(Path.Combine(installed.Directory, "resources", "default.txt")) == "用户修改默认资源", "cross-version update preserves user resources");
+
+        Publish("1.6.0", flat: true);
+        stale = (await service.RefreshAsync()).Single(r => r.Source.Id == source.Id).Plugins.Single();
+        Publish("1.8.0", flat: true);
+        var updateMessages = await service.UpdateAllAsync(new[] { stale with { Plugin = stale.Plugin with { ApiVersion = 99 } } });
+        installed = Catalog.Discover(Path.Combine(root, "plugins"), _ => { })[manifest.Id];
+        Check(installed.Manifest.Version == "1.8.0" && updateMessages.Single().Contains("1.8.0") && !updateMessages.Single().Contains("1.6.0"),
+            "batch update refreshes version and API compatibility and reports the installed version");
+        var unchanged = await service.InstallAsync(stale, true);
+        Check(unchanged.Directory == installed.Directory, "stale update is a no-op when the source version is already installed");
+        Publish("1.7.0", flat: true);
+        unchanged = await service.InstallAsync(stale, true);
+        Check(unchanged.Directory == installed.Directory && unchanged.Manifest.Version == "1.8.0", "source rollback never downgrades an installed plugin");
+
+        server.Set("/repo/index.json", Encoding.UTF8.GetBytes("invalid JSON"));
+        updateMessages = await service.UpdateAllAsync(new[] { stale });
+        Check(updateMessages.Single().Contains("更新失败") && Catalog.Discover(Path.Combine(root, "plugins"), _ => { })[manifest.Id].Directory == installed.Directory,
+            "failed index refresh does not fall back to the stale offer");
+        server.Set("/repo/index.json", JsonSerializer.SerializeToUtf8Bytes(new RepositoryIndex(1, "fixture", Array.Empty<RepositoryPlugin>()), Catalog.Json));
+        await Fails(async () => await service.InstallAsync(stale, true), "removed plugin cannot be updated from a stale offer");
+        server.Set("/repo/index.json", JsonSerializer.SerializeToUtf8Bytes(new RepositoryIndex(1, "fixture", new[] { metadata with { Version = "1.9.0", ApiVersion = 99 } }), Catalog.Json));
+        updateMessages = await service.UpdateAllAsync(new[] { stale });
+        Check(updateMessages.Single().Contains("需要 API 99") && Catalog.Discover(Path.Combine(root, "plugins"), _ => { })[manifest.Id].Directory == installed.Directory,
+            "fresh API requirement is checked before downloading an update");
+        Publish("1.8.0");
+
         PluginRepositoryStore.Remove(root, source.Id);
         Check(Catalog.Discover(Path.Combine(root, "plugins"), _ => { }).ContainsKey(manifest.Id), "removing a source does not uninstall plugins");
         PluginRepositoryStore.Add(root, "Re-added", source.Url);
@@ -263,7 +296,7 @@ internal static class PluginRepositoryTests
         Check(!PluginRepositoryStore.Read(root).Origins.ContainsKey(manifest.Id), "manual ZIP installation clears previous repository ownership");
         service.Subscribe(localOffer);
         Check(PluginRepositoryStore.Owns(PluginRepositoryStore.Read(root), manifest.Id, readded), "manual plugin can explicitly subscribe to its source");
-        Console.WriteLine("Plugin repositories PASS: all 14 official packages, pluginmaster/index catalogs, metadata search, separate install/update URLs, HTTP download, SemVer, cancellation, ownership, locked DLLs, resource preservation, runtime rollback and crash recovery.");
+        Console.WriteLine("Plugin repositories PASS: all 14 official packages, pluginmaster/index catalogs, metadata search, separate install/update URLs, fresh-index cross-version updates, HTTP download, SemVer, cancellation, ownership, locked DLLs, resource preservation, runtime rollback and crash recovery.");
     }
     private sealed record CancelProgress(CancellationTokenSource Source) : IProgress<PluginTransferProgress>
     { public void Report(PluginTransferProgress value) { if (value.Received > 0) Source.Cancel(); } }
