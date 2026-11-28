@@ -29,9 +29,12 @@ internal sealed class ResourceUpdatePanel : IDisposable
         ProcessUpdates();
         Gkms.Sdk.PluginUiText.Wrapped(UiText.T("本次来源（不保存）：留空使用插件配置的默认更新源。支持发布 API、ZIP 下载地址、本地 ZIP 文件；不支持文件夹。","本次來源（不儲存）：空白使用個別設定的預設來源。支援發佈 API、ZIP 網址與本機 ZIP 檔案；不支援資料夾。","Source for this operation (not saved). Blank uses the configured default. Supports release APIs, ZIP URLs and local ZIP files, not folders.","今回の更新元（保存されません）。空欄は設定済みの既定値。リリース API・ZIP URL・ローカル ZIP に対応。フォルダーは非対応。"));
         ImGui.BeginDisabled(busy);
-        ImGui.SetNextItemWidth(-100);
+        var browseLabel=UiText.T("浏览","瀏覽","Browse","参照");
+        var right=ImGui.GetCursorPosX()+ImGui.GetContentRegionAvail().X-1;
+        var browseWidth=ImGui.CalcTextSize(browseLabel).X+ImGui.GetStyle().FramePadding.X*2;
+        ImGui.SetNextItemWidth(Math.Max(1,right-ImGui.GetCursorPosX()-browseWidth-ImGui.GetStyle().ItemSpacing.X));
         if(ImGui.InputText("##source",ref source,4096)) release=null;
-        ImGui.SameLine(); if(ImGui.Button(UiText.T("浏览","瀏覽","Browse","参照"))) picker.Open("ZIP",path=>{source=path; release=null;});
+        ImGui.SameLine(); if(ImGui.Button(browseLabel,new Vector2(browseWidth,0))) picker.Open("ZIP",path=>{source=path; release=null;});
         if(ImGui.Button(UiText.T("检查更新","檢查更新","Check updates","更新確認"))) Check();
         ImGui.SameLine(); ImGui.BeginDisabled(release==null);
         if(ImGui.Button(release?.IsCurrent==true?UiText.T("重新安装","重新安裝","Reinstall","再インストール"):UiText.T("安装资源","安裝資源","Install resources","インストール"))) Install();

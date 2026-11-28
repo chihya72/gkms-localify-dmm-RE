@@ -168,6 +168,25 @@ internal static unsafe class ManagerUiRegressionTests
             buffer.GetType().GetMethod("Append",Fields)!.Invoke(buffer,new object[]{"[2026-11-23 10:00:00.000] [Info] 插件已加载\n[2026-11-23 10:00:01.000] [Warning] 示例兼容性警告\n[2026-11-23 10:00:02.000] [Error] 示例资源更新失败\n  at Plugin.Update()\n"});
             Set(output,"paused",true); output.GetType().GetMethod("Open",Fields)!.Invoke(output,null);
             Draw();Draw(); Screenshot("manager-ui-logs.bmp");
+            typeof(GameOverlay).GetMethod("Destroy",Fields)!.Invoke(overlay,null); Draw();Draw();
+            panel=Get(overlay,"panel");
+            var textManifest=manifest with
+            {
+                Id="localization", Name="文本翻译", Description="保存配置后，诊断标记用于后续文本刷新。",
+                ResourceUpdater="Offline.ResourceUpdater",
+                Settings=new[]
+                {
+                    new PluginSetting("textTest","翻译诊断标记","boolean",System.Text.Json.JsonSerializer.SerializeToElement(false)),
+                    new PluginSetting("autoCheckUpdates","启动时检查更新","boolean",System.Text.Json.JsonSerializer.SerializeToElement(false)) {Section="resources"},
+                    new PluginSetting("updateSource","默认更新源","string",System.Text.Json.JsonSerializer.SerializeToElement("https://uma.chinosk6.cn/api/gkms_trans_data")) {Section="resources"}
+                }
+            };
+            Set(panel,"catalog",new Dictionary<string,Package>{[textManifest.Id]=new(work,textManifest)});
+            Set(panel,"selected",textManifest.Id); Draw();Draw();
+            Check(((SettingsUiSession)Get(panel,"session")).CanSaveSettings,"generic configuration exposes the shared toolbar save action");
+            Screenshot("manager-ui-resource-settings.bmp");
+            mouse(600,760,-1); Draw(); ImGui.GetIO().AddMouseWheelEvent(0,-3); Draw();Draw();Draw();
+            Screenshot("manager-ui-resource-source.bmp");
             Check(!messages.Any(m=>m.Contains("[Error]")),string.Join("\n",messages));
             void Screenshot(string name)
             {

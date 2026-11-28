@@ -44,8 +44,24 @@ internal static class PluginUiTests
                     var rendered = Path.Combine(root, package.Manifest.Id + "-resource-ui.txt");
                     Check(canvas.Frame(session, true, rendered), "资源更新设置绘制成功");
                     var text = File.ReadAllText(rendered).Replace("\r", "").Replace("\n", "");
-                    Check(text.Contains("原版默认地址") && text.Contains(expected), "资源设置必须实际绘制完整默认地址");
+                    Check(!text.Contains("原版默认地址") && text.Contains(expected), "默认地址只显示在可编辑的更新源输入框中");
+                    Check(text.Split("保存配置").Length == 2 && !text.Contains("重新读取"), "普通参数和资源设置共用一个保存按钮，不再绘制重新读取");
+                    Check(canvas.ResourceInputWidth >= canvas.ResourceContentWidth - 3,
+                        $"更新源输入框应占满可用宽度: {canvas.ResourceInputWidth} / {canvas.ResourceContentWidth}");
                     Check(state.GetRawText() == "{}", "查看默认地址不能悄悄写入或覆盖设置");
+                    var custom = "https://example.com/user-selected-translation.zip";
+                    state = JsonSerializer.SerializeToElement(new { updateSource = custom });
+                    using var savedSession = new SettingsUiSession(package, "zh-CN", () => state, (v, _) => state = v,
+                        _ => Task.FromResult("offline"), log.Add);
+                    savedSession.OpenConfigUi();
+                    canvas.Frame(savedSession, true, width: 390);
+                    var customRendered = Path.Combine(root, package.Manifest.Id + "-custom-resource-ui.txt");
+                    Check(canvas.Frame(savedSession, true, customRendered, 390), "窄面板资源设置绘制成功");
+                    var customText = File.ReadAllText(customRendered).Replace("\r", "").Replace("\n", "");
+                    Check(customText.Contains(custom) && !customText.Contains(expected), "输入框显示用户保存的实际来源，不额外显示原版地址");
+                    Check(canvas.ResourceInputWidth >= canvas.ResourceContentWidth - 3,
+                        $"窄面板更新源输入框应占满可用宽度: {canvas.ResourceInputWidth} / {canvas.ResourceContentWidth}");
+                    canvas.SaveBitmap(Path.Combine(root, package.Manifest.Id + "-resource-ui.bmp"));
                 }
                 if (!package.Manifest.HasSettingsUi) Check(canvas.ContentVertices == 0, package.Manifest.Id + ": 不应绘制空配置、重复说明或 JSON 编辑器");
                 if (package.Manifest.Id == "textures")
@@ -59,27 +75,26 @@ internal static class PluginUiTests
         }
         using (var canvas = new Canvas())
         {
-            var state = Json("""{"textTest":false,"autoCheckUpdates":true,"updateSource":"saved.zip"}""");
+            var state = Json("""{"textTest":false,"autoCheckUpdates":true,"updateSource":"saved.zip","keep":42}""");
             JsonElement written = default;
             using var session = new SettingsUiSession(catalog["localization"], "zh-CN", () => state,
                 (value, _) => { written = value; var next = JsonNode.Parse(state.GetRawText())!.AsObject(); foreach (var pair in value.EnumerateObject()) next[pair.Name] = JsonNode.Parse(pair.Value.GetRawText()); state = JsonSerializer.SerializeToElement(next); },
                 _ => Task.FromResult("offline"), log.Add);
             session.OpenConfigUi(); canvas.Frame(session, true); canvas.Frame(session, true);
-            // The last item is the section's Reload button; Save is on the same row.
-            var resourceSave = new Vector2(40, canvas.LastItemTop + 10);
-            state = Json("""{"textTest":true,"autoCheckUpdates":true,"updateSource":"saved.zip"}""");
-            var io = ImGui.GetIO(); io.AddMousePosEvent(resourceSave.X, resourceSave.Y); canvas.Frame(session, true);
-            io.AddMouseButtonEvent(0, true); canvas.Frame(session, true);
-            io.AddMouseButtonEvent(0, false); canvas.Frame(session, true);
-            Check(written.TryGetProperty("autoCheckUpdates", out _) && written.TryGetProperty("updateSource", out _) && !written.TryGetProperty("textTest", out _) && state.GetProperty("textTest").GetBoolean(),
-                "资源分区保存两项更新设置，不覆盖普通参数的外部修改");
-            canvas.Frame(session); var settingsSave = new Vector2(40, canvas.LastItemTop + 10);
-            state = Json("""{"textTest":true,"autoCheckUpdates":false,"updateSource":"new.zip"}""");
-            io.AddMousePosEvent(settingsSave.X, settingsSave.Y); canvas.Frame(session);
-            io.AddMouseButtonEvent(0, true); canvas.Frame(session);
-            io.AddMouseButtonEvent(0, false); canvas.Frame(session);
-            Check(written.TryGetProperty("textTest", out _) && !written.TryGetProperty("updateSource", out _) && state.GetProperty("updateSource").GetString() == "new.zip",
-                "普通参数保存不得覆盖资源更新设置");
+            var io = ImGui.GetIO();
+            void Click(float y)
+            {
+                io.AddMousePosEvent(30, y + 10); canvas.Frame(session, true);
+                io.AddMouseButtonEvent(0, true); canvas.Frame(session, true);
+                io.AddMouseButtonEvent(0, false); canvas.Frame(session, true);
+            }
+            Click(canvas.FirstFieldTop);
+            Click(canvas.ResourceTop);
+            Check(!state.GetProperty("textTest").GetBoolean() && state.GetProperty("autoCheckUpdates").GetBoolean(), "编辑两个分区在点击保存前不修改已保存配置");
+            Click(canvas.LastItemTop);
+            Check(written.GetProperty("textTest").GetBoolean() && !written.GetProperty("autoCheckUpdates").GetBoolean() && written.GetProperty("updateSource").GetString() == "saved.zip",
+                "同一个保存按钮同时提交普通参数和资源设置");
+            Check(!written.TryGetProperty("keep", out _) && state.GetProperty("keep").GetInt32() == 42, "统一保存保留未知配置字段");
         }
         foreach (var orientation in new[] { "game", "portrait", "landscape" })
         using (var canvas = new Canvas())
@@ -180,6 +195,10 @@ internal static class PluginUiTests
         public int Vertices { get; private set; }
         public int ContentVertices { get; private set; }
         public float LastItemTop { get; private set; }
+        public float FirstFieldTop { get; private set; }
+        public float ResourceTop { get; private set; }
+        public float ResourceInputWidth { get; private set; }
+        public float ResourceContentWidth { get; private set; }
         public unsafe Canvas()
         {
             device = GraphicsDevice.CreateD3D11(new GraphicsDeviceOptions());
@@ -191,21 +210,45 @@ internal static class PluginUiTests
             ImGui.Render(); ImGuiAppearance.Configure(); renderer.RecreateFontDeviceTexture(device);
             Check(ImGui.GetIO().Fonts.Fonts[0].FindGlyphNoFallback('译').NativePtr != null, "中文字体未构建");
         }
-        public bool Frame(SettingsUiSession session, bool showResources = false, string? logFile = null)
+        public bool Frame(SettingsUiSession session, bool showResources = false, string? logFile = null, float width = 900)
         {
             ImGui.SetCurrentContext(context); renderer.Begin();
-            ImGui.SetNextWindowPos(Vector2.Zero); ImGui.SetNextWindowSize(new Vector2(900, 760));
+            ImGui.SetNextWindowPos(Vector2.Zero); ImGui.SetNextWindowSize(new Vector2(width, 760));
             ImGui.Begin("Settings", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings);
-            if (logFile != null) ImGui.LogToFile(-1, logFile);
+            if (logFile != null)
+            {
+                File.WriteAllText(logFile, "");
+                ImGui.LogToFile(-1, logFile);
+            }
+            if (session.CanSaveSettings)
+            {
+                if (ImGui.Button("保存配置")) session.SaveSettings();
+                LastItemTop = ImGui.GetItemRectMin().Y;
+            }
             var before = ImGui.GetWindowDrawList().VtxBuffer.Size;
+            FirstFieldTop = ImGui.GetCursorScreenPos().Y;
             if (!session.DrawFrame()) return false;
             if (showResources)
             {
                 ImGui.PushID("resource-update");
+                ResourceTop = ImGui.GetCursorScreenPos().Y;
+                ResourceContentWidth = ImGui.GetContentRegionAvail().X;
+                var draw = ImGui.GetWindowDrawList();
+                var start = draw.VtxBuffer.Size;
                 if (!session.DrawResourceSettings()) return false;
+                var frameColor = ImGui.GetColorU32(ImGuiCol.FrameBg);
+                var left = float.MaxValue;
+                var right = float.MinValue;
+                for (var i = start; i < draw.VtxBuffer.Size; i++)
+                    if (draw.VtxBuffer[i].col == frameColor)
+                    {
+                        left = Math.Min(left, draw.VtxBuffer[i].pos.X);
+                        right = Math.Max(right, draw.VtxBuffer[i].pos.X);
+                    }
+                ResourceInputWidth = right - left;
                 ImGui.PopID();
             }
-            LastItemTop = ImGui.GetItemRectMin().Y;
+            if (!session.CanSaveSettings) LastItemTop = ImGui.GetItemRectMin().Y;
             ContentVertices = ImGui.GetWindowDrawList().VtxBuffer.Size - before;
             if (logFile != null) ImGui.LogFinish();
             ImGui.End();
@@ -249,6 +292,25 @@ internal static class PluginUiTests
                 for (var y = 0; y < 760; y += 5)
                     for (var x = 0; x < 900; x += 5) colors.Add(Marshal.ReadInt32(mapped.Data, checked((int)(y * mapped.RowPitch + x * 4))));
                 return colors.Count > 4;
+            }
+            finally { device.Unmap(staging); }
+        }
+        public void SaveBitmap(string path)
+        {
+            commands.Begin(); commands.CopyTexture(color, staging); commands.End(); device.SubmitCommands(commands); device.WaitForIdle();
+            var mapped = device.Map(staging, MapMode.Read);
+            try
+            {
+                using var writer = new BinaryWriter(File.Create(path));
+                const int size = 900 * 760 * 4;
+                writer.Write((ushort)0x4d42); writer.Write(54 + size); writer.Write(0); writer.Write(54); writer.Write(40); writer.Write(900); writer.Write(-760);
+                writer.Write((ushort)1); writer.Write((ushort)32); writer.Write(0); writer.Write(size); writer.Write(2835); writer.Write(2835); writer.Write(0); writer.Write(0);
+                for (var y = 0; y < 760; y++)
+                    for (var x = 0; x < 900; x++)
+                    {
+                        var pixel = Marshal.ReadInt32(mapped.Data, checked((int)(y * mapped.RowPitch + x * 4)));
+                        writer.Write((byte)(pixel >> 16)); writer.Write((byte)(pixel >> 8)); writer.Write((byte)pixel); writer.Write((byte)(pixel >> 24));
+                    }
             }
             finally { device.Unmap(staging); }
         }

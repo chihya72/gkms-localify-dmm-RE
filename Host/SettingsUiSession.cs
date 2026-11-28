@@ -13,6 +13,7 @@ public sealed class SettingsUiSession : IDisposable
     private IPluginSettingsUi? plugin;
     public string? Fault { get; private set; }
     public ISettingsUiContext Services => context;
+    public bool CanSaveSettings => plugin is SchemaSettingsUi;
     private bool disposed;
 
     public SettingsUiSession(Package package, string language, Func<JsonElement> read,
@@ -64,6 +65,14 @@ public sealed class SettingsUiSession : IDisposable
         if (Fault != null) return false;
         try { if (plugin is SchemaSettingsUi schema) schema.DrawResourceSettings(); return true; }
         catch (Exception error) { Fail(error); return false; }
+    }
+    public void SaveSettings()
+    {
+        context.CheckThread();
+        if (disposed) throw new ObjectDisposedException(nameof(SettingsUiSession));
+        if (Fault != null) throw new InvalidOperationException(Fault);
+        if (plugin is not SchemaSettingsUi schema) throw new InvalidOperationException("此设置页自行管理保存入口。");
+        schema.SaveSettings();
     }
     private void Fail(Exception error) { Fault = error.GetBaseException().Message; context.Log("[Error] 设置界面已停止: " + Fault); }
 

@@ -187,16 +187,31 @@ internal sealed class OverlayPanel : IDisposable
     private void DrawDetails(Package package)
     {
         var m=package.Manifest;
+        if(Catalog.Supports(m.ApiVersion) && m.HasSettingsUi && session==null) try
+        {
+            session=new SettingsUiSession(package,UiText.Language,
+                ()=>Catalog.ReadProfile(Path.Combine(root,"profile.json"),catalog).Settings?.GetValueOrDefault(m.Id)??default,
+                (values,replace)=>{ProfileEditor.Apply(root,catalog,new Dictionary<string,bool>(),replace:new(m.Id,JsonNode.Parse(values.GetRawText())!.AsObject()),merge:!replace); Runtime("reload-profile");},
+                async token=>(await RuntimeClient.SendAsync(root,"reload-resources",m.Id).WaitAsync(token))?.Message??UiText.Offline,log);
+            session.OpenConfigUi();
+        }
+        catch(Exception e) {session?.Dispose(); session=null; status=e.GetBaseException().Message;}
         ImGui.TextUnformatted(m.DisplayName(UiText.Language)); ImGui.TextDisabled($"{m.Id} · {m.Version} · API {m.ApiVersion}");
         DrawPluginState(m.Id);
         Gkms.Sdk.PluginUiText.Wrapped(m.Description??"");
         DrawCapability(UiText.T("插件热启停","外掛即時啟停","Plugin hot toggle","プラグイン即時切替"), m.SupportsHotEnable && m.SupportsHotDisable);
-        DrawCapability(UiText.T("参数热更新","參數即時更新","Settings hot reload","設定即時更新"), m.HasSettingsUi ? m.SupportsSettingsReload : null);
         DrawCapability(UiText.T("资源热重载","資源即時重載","Resource hot reload","リソース即時再読込"), m.CanReloadResources);
         ImGui.BeginDisabled(busy);
         ImGui.BeginDisabled(updates.GetValueOrDefault(m.Id)?.Busy==true);
         if(ImGui.Button(UiText.T("卸载插件","解除安裝","Uninstall","削除"))) confirmRemove=true;
         ImGui.EndDisabled();
+        if(session?.CanSaveSettings==true)
+        {
+            ImGui.SameLine();
+            if(ImGui.Button(UiText.T("保存配置","儲存設定","Save settings","設定を保存")))
+                try {session.SaveSettings(); status=UiText.T("配置已保存。","設定已儲存。","Settings saved.","設定を保存しました。");}
+                catch(Exception e) {status=e.GetBaseException().Message;}
+        }
         if(m.CanReloadResources)
         {
             ImGui.SameLine(); ImGui.BeginDisabled(!connected || !active.Contains(m.Id));
@@ -209,15 +224,6 @@ internal sealed class OverlayPanel : IDisposable
         if(!ImGui.BeginTabBar("details")) return;
         if(ImGui.BeginTabItem(UiText.T("插件配置","外掛設定","Plugin settings","プラグイン設定")))
         {
-            if(m.HasSettingsUi && session==null) try
-            {
-                session=new SettingsUiSession(package,UiText.Language,
-                    ()=>Catalog.ReadProfile(Path.Combine(root,"profile.json"),catalog).Settings?.GetValueOrDefault(m.Id)??default,
-                    (values,replace)=>{ProfileEditor.Apply(root,catalog,new Dictionary<string,bool>(),replace:new(m.Id,JsonNode.Parse(values.GetRawText())!.AsObject()),merge:!replace); Runtime("reload-profile");},
-                    async token=>(await RuntimeClient.SendAsync(root,"reload-resources",m.Id).WaitAsync(token))?.Message??UiText.Offline,log);
-                session.OpenConfigUi();
-            }
-            catch(Exception e) {session?.Dispose(); session=null; status=e.GetBaseException().Message;}
             ImGui.BeginDisabled(busy);
             if(session!=null && !session.DrawFrame()) throw new InvalidOperationException(session.Fault);
             ImGui.EndDisabled();

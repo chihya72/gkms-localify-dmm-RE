@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Collections.Concurrent;
 using Gkms.Sdk;
 
@@ -131,6 +132,21 @@ public sealed class PluginHost : IDisposable
             var previous = running.SingleOrDefault(p => p.Scope.Id == id);
             var samePackage = previous != null && previous.Package.Directory == package.Directory &&
                 Equivalent(JsonSerializer.SerializeToElement(previous.Package.Manifest, Catalog.Json), JsonSerializer.SerializeToElement(package.Manifest, Catalog.Json));
+            if (samePackage && previous != null)
+            {
+                JsonObject? effective = null;
+                foreach (var field in previous.Package.Manifest.Settings.Where(field => field.RequiresRestart))
+                {
+                    var hasOld = Options(previous.Scope.Settings).TryGetProperty(field.Key, out var oldValue);
+                    var hasNew = Options(options).TryGetProperty(field.Key, out var newValue);
+                    if (Equivalent(hasOld ? oldValue : field.Default, hasNew ? newValue : field.Default)) continue;
+                    restartPending[id] = "参数已保存，下次启动游戏时生效。";
+                    effective ??= JsonNode.Parse(Options(options).GetRawText())!.AsObject();
+                    if (hasOld) effective[field.Key] = JsonNode.Parse(oldValue.GetRawText());
+                    else effective.Remove(field.Key);
+                }
+                if (effective != null) options = JsonSerializer.SerializeToElement(effective);
+            }
             var sameSettings = previous != null && Equivalent(Options(previous.Scope.Settings), Options(options));
             if (samePackage && sameSettings && !cleanupErrors.ContainsKey(id)) continue;
             if (previous == null && !initial && !package.Manifest.SupportsHotEnable)

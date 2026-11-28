@@ -14,6 +14,34 @@ internal static class TextStartupTests
         catch (InvalidOperationException error) when (error.Message.Contains("不支持主动资源重载") || error.Message.Contains("尚未启用")) { return; }
         throw new Exception("文本资源重载必须被明确拒绝");
     }
+    public static void RunDiagnostics(string work, string packages)
+    {
+        Check(Directory.Exists(work), "使用已有的离线验证目录");
+        var profile = Path.Combine(work, "diagnostics-profile.json");
+        void Save(bool enabled) => File.WriteAllText(profile, JsonSerializer.Serialize(new
+        {
+            enabled = new[] { "localization" },
+            settings = new { localization = new { textTest = enabled, autoCheckUpdates = false } }
+        }));
+        var logs = new List<string>();
+        Save(false);
+        using var host = new PluginHost(new TestGame(), logs.Add);
+        host.Start(packages, profile, work);
+        Check(host.Active.Contains("localization"), "文本插件应正常启用");
+        var loaded = logs.Count(message => message.EndsWith(": 已加载。"));
+        var text = new Tmp();
+        var ui = new Ui();
+        foreach (var enabled in new[] { false, true, false, true })
+        {
+            Save(enabled); host.ReloadProfile();
+            text.SetText("诊断测试未译原文"); ui.SetValue("diagnostics.missing", "诊断测试未译原文");
+            Check(text.text == (enabled ? "[T1]" : "") + "诊断测试未译原文" &&
+                ui.GetValue("diagnostics.missing") == (enabled ? "[I18]" : "") + "诊断测试未译原文", "保存后两个入口运行中切换标记");
+            Check(host.GetStates()["localization"].State != PluginRunState.RestartRequired &&
+                logs.Count(message => message.EndsWith(": 已加载。")) == loaded, "切换诊断不重启插件或重新加载词典");
+        }
+        Console.WriteLine("翻译诊断通过：保存后运行中多次切换 I18n / TMP 标记，不重启插件或加载词典。");
+    }
     public static void Run(string work, string sourcePackages)
     {
         var root = Directory.CreateDirectory(Path.Combine(work, "text-startup")).FullName;
@@ -74,6 +102,14 @@ internal static class TextStartupTests
             StoryBytes(stories, octo);
             Resources("二"); File.WriteAllText(Path.Combine(stories, "late.txt"), "新增剧情");
             File.WriteAllText(Path.Combine(resources, "localization.json"), "{}");
+            var loaded = logs.Count(s => s.EndsWith(": 已加载。"));
+            Profile(true, diagnose: true); host.ReloadProfile();
+            var diagnosis = new Tmp(); diagnosis.SetText("未译"); ui.SetValue("missing", "未译");
+            Check(diagnosis.text == "[T1]未译" && ui.GetValue("missing") == "[I18]未译", "保存诊断参数后两个翻译入口立即采用新值");
+            ui.SetValue("home.mission_pass", "パス");
+            Check(ui.GetValue("home.mission_pass") == "通票一" && loaded == logs.Count(s => s.EndsWith(": 已加载。")), "参数更新不重新加载插件或词典");
+            Profile(true); host.ReloadProfile(); diagnosis.SetText("未译"); ui.SetValue("missing", "未译");
+            Check(diagnosis.text == "未译" && ui.GetValue("missing") == "未译", "关闭诊断标记立即恢复正常输出");
             RejectReload(host); Check(text.text == "通票一", "拒绝重载不回写当前显示");
             for (var i = 0; i < 3; i++)
             {

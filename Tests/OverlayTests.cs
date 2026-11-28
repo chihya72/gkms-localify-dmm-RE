@@ -84,12 +84,12 @@ internal static unsafe class OverlayTests
             Click(150,419); Check(frame()==0,"settings detail frame");
             fixed(byte* ptr=rgba) Check(pixels(ptr,size,out width,out height)==size,"read settings pixels");
             SaveBmp(Path.Combine(work,"overlay-settings.bmp"),rgba,width,height);
-            Click(500,500);
+            Click(500,474);
             var key=Function<Key>("fixture_overlay_key"); var character=Function<Character>("fixture_overlay_char");
             key(0x11,1); key('A',1); Check(frame()==0,"select field text"); key('A',0); key(0x11,0); Check(frame()==0,"release editor modifiers");
             foreach(var c in "144") character(c); Check(frame()==0,"type parameter");
             key(0x0d,1); Check(frame()==0,"commit parameter"); key(0x0d,0); Check(frame()==0,"release enter");
-            Click(450,566);
+            Click(530,386);
             WaitForManager();
             using(var saved=JsonDocument.Parse(File.ReadAllText(profile)))
                 Check(saved.RootElement.GetProperty("settings").GetProperty("frame-rate").GetProperty("fps").GetInt32()==144 && saved.RootElement.GetProperty("settings").GetProperty("another.plugin").GetProperty("keep").GetInt32()==42,"in-game parameter editing preserves independent plugin configuration");

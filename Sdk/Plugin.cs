@@ -91,8 +91,11 @@ public static class GameMethods
         ?? throw new MissingMethodException(typeof(T).FullName, name);
 
     public static T Option<T>(this IPluginContext context, string key, T fallback)
+        => context.Settings.Option(key, fallback);
+
+    public static T Option<T>(this JsonElement settings, string key, T fallback)
     {
-        if (context.Settings.ValueKind != JsonValueKind.Object || !context.Settings.TryGetProperty(key, out var value))
+        if (settings.ValueKind != JsonValueKind.Object || !settings.TryGetProperty(key, out var value))
             return fallback;
         return value.Deserialize<T>() ?? throw new InvalidDataException($"Invalid option {key}");
     }

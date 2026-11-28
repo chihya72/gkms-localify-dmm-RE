@@ -46,6 +46,12 @@ internal static class DmmParityTests
             { Campus.Live.LiveUtility.Limit = pair.Item1; Check(Campus.Live.LiveUtility.GetAutoPhotoLimitCount() == pair.Item2, "AutoPhoto original limit switch"); }
             Campus.Live.LiveUtility.Choices = new[] { 1,3,5,99 };
             Check(Campus.Live.LiveUtility.AutoPhotoCountTypeValues().SequenceEqual(new[] {10,20,30,99}), "AutoPhoto only replaces first three elements");
+            var editedChoices = Campus.Live.LiveUtility.Choices;
+            var loaded = log.Count(s => s.EndsWith(": 已加载。"));
+            File.WriteAllText(profile, """{"enabled":["graphics","frame-rate","auto-photo","schedule-sp"],"settings":{"graphics":{"reflectionQuality":99,"lodQuality":-1},"frame-rate":{"fps":90},"auto-photo":{"counts":[12,24,36]}}}"""); host.ReloadProfile();
+            Campus.Live.LiveUtility.Limit = 3;
+            Check(editedChoices.SequenceEqual(new[] {12,24,36,99}) && Campus.Live.LiveUtility.GetAutoPhotoLimitCount() == 36 &&
+                loaded == log.Count(s => s.EndsWith(": 已加载。")), "AutoPhoto hot settings update existing choices and callbacks without restarting");
             Campus.Live.LiveUtility.Choices = new[] { 1,3 };
             Check(Campus.Live.LiveUtility.AutoPhotoCountTypeValues().SequenceEqual(new[] {1,3}), "AutoPhoto short array remains unchanged");
             Campus.Live.LiveUtility.Choices = null!;

@@ -73,7 +73,7 @@ API 2 必填：`id`、`name`、`author`、`version`、`description`、`apiVersio
 | `presets` | `{ "name": "预设名", "values": { ... } }` 数组，只能设置已声明字段 |
 | `resourceUpdater` | 实现资源更新接口的公开无参类型，位于同一程序集 |
 | `canReloadResources` | 为 `true` 时入口必须实现 `IResourceReloadable`，管理器显示资源重载操作 |
-| `requiresRestart` | 默认 `false`。为 `true` 时，未显式声明的热启用、热停用能力默认关闭，参数更新默认延后；不再控制资源重载。文本插件使用此模式，其资源重载独立声明为关闭。 |
+| `requiresRestart` | 默认 `false`。为 `true` 时，未显式声明的热启用、热停用能力默认关闭，参数更新默认延后；不控制资源重载。可用 `canReloadSettings: true` 单独允许参数更新，例如文本插件。注意与 `settings` 单个字段中的同名属性区分。 |
 | `canHotEnable` / `canHotDisable` | 分别声明运行中启用、停用能力；省略时取 `!requiresRestart`。运行中安装的新插件也遵守声明。 |
 | `canReloadSettings` | 参数热更新能力；省略时仅在同时支持热启用、热停用时启用。优先调用 `ISettingsReloadable`；否则通过释放并创建实例应用。不能热启停却声明可更新参数时必须实现该接口。 |
 | `settingsUi` | 同一插件程序集内实现 `IPluginSettingsUi` 的公开无参类型；不填且有配置字段时使用通用配置页，两者皆无则不显示配置页。 |
@@ -89,7 +89,7 @@ Start 失败或停用：取消令牌 → 逆序释放作用域资源/Hook → �
 
 某个插件失败不阻止其他插件加载。某个取消回调、资源释放或插件 `Dispose` 抛异常时，宿主记录错误并继续后续清理。已停止作用域拒绝新 Hook、子作用域与资源注册；排队但尚未执行的操作丢弃。
 
-配置重载由框架完成：选择和参数未改变的插件保持运行；改变的插件停止后重新启动。声明字段验证失败时保留原实例；启动失败时尝试恢复上一次有效参数。恢复也可能因游戏版本等外部原因失败，此时日志报告错误，不把失败插件标记为活动。
+配置重载由框架完成：选择和参数未改变的插件保持运行；变化的参数优先交给 `ISettingsReloadable` 原地应用，没有该接口但支持热启停时才停止并创建新实例。不能运行中应用的参数保留当前值并显示「待重启」。声明字段验证失败时保留原实例；重新配置启动失败时尝试恢复上一次有效参数。恢复也可能因游戏版本等外部原因失败，此时日志报告错误，不把失败插件标记为活动。
 
 `Dispose` 是停止回调和恢复可恢复改动的保证，不代表 CLR 已立即卸载 DLL。未释放的静态事件、任务或原生回调会阻止程序集回收。安装新 DLL 建议在游戏关闭时进行；不支持同版本文件改动自动热更新二进制。
 
@@ -114,7 +114,7 @@ services.Own(subscription); // subscription 实现 IDisposable
 | `Id` / `PackageDirectory` | 插件身份及安装位置；程序集与清单不应在运行中改写，下载资源可放在其 `resources` 子目录 |
 | `StorageDirectory` | `gakumas-local\re\data\<id>`，首次访问创建；保存缓存和插件自有文件 |
 | `DataDirectory` | 共享的 `gakumas-local` 根目录，用于读取旧版配置等；汉化资源使用插件自己的 `resources`，不要回退到共享 `local-files` |
-| `Settings` | 当前启动的 JSON 快照；`Option<T>` 按键读取，`ReadSettings<T>` 读取公开属性的类型化配置 |
+| `Settings` | 当前实例已经应用的 JSON 快照；原地更新成功后宿主更新根作用域快照。`Option<T>` 按键读取，`ReadSettings<T>` 读取公开属性的类型化配置。已有子作用域的快照不会自动传播，插件须在重载接口中更新子组件。 |
 | `Log` | 自动加插件 ID 前缀，可在后台线程调用；不记录凭据 |
 | `FindType` / `Find` / `Require` | 通过游戏接入层查找类型及精确方法签名 |
 | `Patch` | 前置、后置 Hook，默认优先级 400 |
@@ -142,9 +142,13 @@ Ctrl+U 打开的管理面板与「插件配置」页均使用游戏内 Dear ImGu
 
 每个字段必填 `key`、`label`、`type`、`default`；key 是以字母开头的字母/数字/下划线标识。可用 `min` / `max` 限定数值及数组元素，`elementLabels` 标注各数组元素，`labels` 按语言映射标签。所有声明字段都通过对应控件编辑，旧 `advanced` 标记不再隐藏字段。显示缺失参数时使用声明的默认值。
 
+`section: "resources"` 将字段放入资源更新分区；其他字段在普通参数区。SDK 2.0.7 的 `requiresRestart: true` 仅将该字段的新值延后，不阻止其他字段应用。例如 `{"key":"autoCheckUpdates","label":"启动时检查更新","type":"boolean","default":false,"section":"resources","requiresRestart":true}`。这是字段策略，不会移除插件的参数重载接口。
+
 宿主不会把 UI 默认值自动写进启动快照；未提供的字段由插件自己的默认值或资源配置处理。作者应让声明默认值与代码默认值一致；如 `autoCheckUpdates` 省略时继承原 DMM 配置，要在说明中明确。通用 ImGui 页仅写入修改过的字段，保留未修改的缺省状态。未知字段会保留；跨字段约束由插件在注册游戏回调前校验。
 
 配置唯一来源是 `profile.json` 的 `settings.<id>`。游戏入口读取启动快照，设置入口通过 `ISettingsUiContext.SaveSettings` 保存自己的参数。文件锁与原子替换避免写入一半或覆盖其他插件；保存成功后管理器立即请求运行中的宿主应用配置。游戏未连接时保留保存结果并显示离线状态。需要自己的历史记录或复杂私有数据时使用 `StorageDirectory`。
+
+继承 `SchemaSettingsUi` 的设置页由管理器在“卸载插件”右侧提供统一的“保存配置”按钮，一次提交普通参数和资源设置。两个分区不再绘制独立的保存或重新读取按钮；管理器通过 `SchemaSettingsUi.SaveSettings()` 提交编辑值。完全自定义的 `IPluginSettingsUi` 仍管理自己的交互。
 
 ### 自定义 ImGui 设置入口
 
@@ -227,7 +231,7 @@ public sealed class SettingsUi : IPluginSettingsUi
 
 宿主只接受当前 `apiVersion: 2`，全部官方插件、第三方示例及元数据使用同一规则；其他 API 等级在发现阶段被拒绝。
 
-SDK 包版本为 `2.0.6`，程序集版本保持 `2.0.0.0`，API 等级仍为 2；日志等级扩展兼容现有插件，原有 `Log(string)` 仍可使用。本版修复插件更新前的订阅索引刷新，接口保持兼容。兼容更新递增包版本，破坏兼容性的接口变更须提升 API 等级并重新编译插件。SDK 包在[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载。原 DMM 用户配置导入属于资源与业务数据迁移。
+SDK 包版本为 `2.0.7`，程序集版本保持 `2.0.0.0`，API 等级仍为 2。本版增加 `PluginSetting.RequiresRestart`、`JsonElement.Option<T>()` 和通用配置页的 `SchemaSettingsUi.SaveSettings()`；`ISettingsReloadable` 与 `canReloadSettings` 继续保留。旧版 API 2 插件可在新版框架中运行；调用新增方法、使用字段级延后生效或统一保存入口的插件须配套框架 2.0.7 或更新版本，仅 API 等级相同不代表旧宿主拥有新增能力。兼容更新递增包版本，破坏兼容性的接口变更须提升 API 等级并重新编译插件。SDK 包在[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载；尚未发布的源码版本可在本地打包。原 DMM 用户配置导入属于资源与业务数据迁移。
 
 ## 9. 开始编写自己的插件
 
@@ -263,7 +267,7 @@ $sdk = 'D:\gkms-localify-dmm-RE\Sdk\bin\Release\net6.0\Gkms.Sdk.dll'
 if ($LASTEXITCODE -ne 0) { throw "插件构建失败 $LASTEXITCODE" }
 ```
 
-也可从框架本地打包产物安装 `Gkms.Sdk.2.0.6.nupkg`；本仓库不假定该包已发布到公共 NuGet。打包命令在仓库根目录执行：
+也可从框架本地打包产物安装 `Gkms.Sdk.2.0.7.nupkg`；本仓库不假定该包已发布到公共 NuGet。打包命令在仓库根目录执行：
 
 ```powershell
 $project = Join-Path $PWD 'Sdk\Gkms.Sdk.csproj'
@@ -351,6 +355,14 @@ if ($LASTEXITCODE -ne 0) { throw "SDK 打包失败 $LASTEXITCODE" }
 同步 `Dispose` 应立即恢复功能状态。若恢复显示还需要等待游戏的只读请求，可实现 `IPluginStopCleanup.CreateStopCleanup()`，返回 `IPluginCleanup`。宿主只在普通停用时、移除原作用域 Hook 并完成 Dispose 后调用它；启动失败、配置替换和宿主退出不会启动收尾。
 
 收尾得到独立作用域，`Update()` 在 Unity 线程每帧调用，完成时返回 true，失败时抛出可读错误。宿主最多保留 30 秒，并在重新启用同一 ID 或退出时先取消收尾、清理 Hook，再释放加载上下文。收尾必须在 Dispose 中取消未完成请求，且不得重新启用已经关闭的功能。停止时丢弃的原作用域队列仍不会执行。此扩展需要同步更新宿主与 SDK；仅给旧版宿主替换插件 DLL 不受支持。既有未使用此扩展的 API 2 插件保持原生命周期。
+
+## 参数保存与运行中应用
+
+保存只负责校验并持久化参数，不表示功能已经采用新值。宿主分别保留已保存配置和运行实例的配置；无法立即应用的变更显示「待重启」，撤销变更或下次启动后清除该状态。配置页不再显示「参数热更新」能力行。
+
+入口可实现 `ISettingsReloadable.ReloadSettings(JsonElement)` 并声明 `canReloadSettings: true`。宿主在 Unity 线程调用接口，成功后更新运行配置快照；异常显示「失败」，插件应保留上次有效状态。这个接口独立于 `canHotEnable` / `canHotDisable`。未实现接口、但支持热启停的插件仍由宿主按释放旧实例、启动新实例的路径应用参数，启动失败时恢复旧实例的有效配置。
+
+SDK 2.0.7 支持在单个 `settings` 字段上声明 `requiresRestart: true`。宿主保留该字段的运行值，把其余字段交给参数重载接口或重新配置路径；新字段值仍保存在配置文件中。一次保存既可即时应用部分参数，也可保留「待重启」。适用于「启动时检查更新」等只在启动入口消费的参数，不能用来隐藏真正的应用异常。
 
 ## 10. 如何验证合规
 

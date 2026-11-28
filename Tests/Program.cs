@@ -26,6 +26,16 @@ if (args.Length == 3 && args[0] == "--repositories")
     PluginRepositoryTests.Run(args[2], args[1]);
     return 0;
 }
+if (args.Length == 3 && args[0] == "--plugin-ui")
+{
+    PluginUiTests.Run(args[2], args[1]);
+    return 0;
+}
+if (args.Length == 3 && args[0] == "--diagnostic-toggle")
+{
+    TextStartupTests.RunDiagnostics(args[2], args[1]);
+    return 0;
+}
 if (args.Length >= 3 && args[0] == "--window")
 {
     WindowMessageTests.Run(args[1], args[2]);
@@ -337,6 +347,12 @@ static void VerifyCameraPhysics(string work, string packages)
         Check(host.Active.Count == 2, string.Join(Environment.NewLine,log));
         actor.LateUpdate(); UnityEngine.Input.Held.Add("e"); Tick(); UnityEngine.Input.Held.Clear();
         Check(!face.activeSelf && !hair.activeSelf && brain.OutputCamera.fieldOfView < 60,"启用第一人称立即隐藏头部，原版 E 键减少视野");
+        var currentFov = brain.OutputCamera.fieldOfView;
+        var loaded = log.Count(s => s.EndsWith(": 已加载。"));
+        File.WriteAllText(profile, """{"enabled":["camera-control","physics"],"settings":{"camera-control":{"mode":"first-person","hideHead":false,"speed":2,"sensitivity":2},"physics":{"useScale":true,"scale":1.2,"axisX":[2,0.5]}}}"""); host.ReloadProfile();
+        Check(face.activeSelf && !hair.activeSelf && brain.OutputCamera.fieldOfView == currentFov && loaded == log.Count(s => s.EndsWith(": 已加载。")), "镜头参数原地更新，立即恢复头部且保留当前视角和 FOV");
+        File.WriteAllText(profile, """{"enabled":["camera-control","physics"],"settings":{"camera-control":{"mode":"first-person","hideHead":true},"physics":{"useScale":true,"scale":1.2,"axisX":[2,0.5]}}}"""); host.ReloadProfile();
+        actor.LateUpdate(); Check(!face.activeSelf && !hair.activeSelf, "参数重新启用头部隐藏");
         Tick("f"); actor.LateUpdate(); Check(face.activeSelf && !hair.activeSelf,"切回自由镜头恢复原有头部状态");
         Tick("f"); actor.LateUpdate();
         var data = new Campus.Common.CampusActorAnimationInitializeData(); var rig = new Campus.Common.CampusActorAnimation();

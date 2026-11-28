@@ -12,7 +12,7 @@ public sealed class ReloadProbe : ILocalifyPlugin, IResourceReloadable, ISetting
     {
         var next = settings.GetProperty("message").GetString()!;
         if (next == "reject") throw new InvalidDataException("测试参数拒绝应用。");
-        message = next; context.Log("参数已重载: " + next);
+        message = next; context.Log("参数已重载: " + next + ";startup=" + settings.Option("startup", false));
     }
     public void ReloadResources()
     {

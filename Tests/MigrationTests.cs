@@ -238,6 +238,13 @@ internal static class MigrationTests
             Check(controller._initialized && controller._gyro?.gyroSupported == true && !controller._isGyro && new Campus.Photography.Photography3DPresenter().IsGyroSupported, "原版初始化 VLGyro，不改写控制器 IsGyro 开关");
             UnityEngine.Input.Held.Add("[7]"); UnityEngine.Time.frameCount++; var roll = controller.Rotation;
             Check(roll.z > 0 && roll.x == 0 && roll.y == 0 && controller.Rotation == roll, "7 产生滚转且一帧只采样一次");
+            var loaded = log.Count(s => s.EndsWith(": 已加载。"));
+            var sensor = controller._gyro;
+            File.WriteAllText(profile, """{"enabled":["gyro","camera-control"],"settings":{"camera-control":{"hideHead":false},"gyro":{"sensitivity":2,"invertX":true,"invertY":true}}}"""); host.ReloadProfile();
+            Check(controller.Rotation == roll && ReferenceEquals(sensor, controller._gyro) && loaded == log.Count(s => s.EndsWith(": 已加载。")), "陀螺仪调参保留控制器和已转动视角");
+            UnityEngine.Time.frameCount++; var faster = controller.Rotation;
+            Check(Math.Abs(faster.z - MathF.Sin(3 * MathF.Asin(roll.z))) < .0001f, "陀螺仪新灵敏度在下一帧生效");
+            roll = faster;
             LiveGameState.InputCapture = () => true;
             UnityEngine.Time.frameCount++; Check(controller.Rotation == roll, "面板占用输入时不采样异步陀螺仪按键");
             LiveGameState.InputCapture = null;

@@ -6,7 +6,7 @@
 
 需要 Windows x64、PowerShell 7 和 .NET SDK 8 或以上。插件编译目标为 `net6.0`；实际使用插件还需要匹配当前 API 的 RE 框架及其运行环境。开发普通 C# 插件不需要编译框架的 C++ 入口，也不需要 BepInEx 或预生成的游戏 interop DLL。
 
-当前 SDK 包为 `Gkms.Sdk.2.0.6.nupkg`，插件清单使用 `apiVersion: 2`。SDK 包版本、API 等级和你自己的插件版本是三个不同的值。
+当前 SDK 包为 `Gkms.Sdk.2.0.7.nupkg`，插件清单使用 `apiVersion: 2`。SDK 包版本、API 等级和你自己的插件版本是三个不同的值。使用本版新增方法或字段级重启声明时，运行环境须为框架 2.0.7 或更新版本。
 
 从[框架 Release](https://github.com/chihya72/gkms-localify-dmm-RE/releases/latest) 下载 SDK NuGet 包，放到自己的本地 NuGet 源目录，例如 `D:\PluginWork\sdk-feed`。本地框架构建生成的包位于 `out\sdk`；目前不要假定公共 NuGet 已发布 `Gkms.Sdk`。如果自行构建框架，可在框架仓库运行 `Build.ps1`，具体要求见框架 README。
 
@@ -35,7 +35,7 @@ SDK 包内包含：
     <Version>1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gkms.Sdk" Version="[2.0.6]" ExcludeAssets="runtime" />
+    <PackageReference Include="Gkms.Sdk" Version="[2.0.7]" ExcludeAssets="runtime" />
     <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
@@ -101,6 +101,10 @@ public sealed class Options
 声明 `settings` 后，框架自动提供配置页，本例不需要自己编写 ImGui。参数存储在框架的 `profile.json` 中，由管理器保存；插件只读取自己的设置。清单默认值与代码属性默认值应保持一致：缺少的设置不会自动补入启动快照。
 
 本例支持热启停。保存有变化的配置后，宿主通过停止并创建新实例应用参数；若需要原地更新，可以实现 `ISettingsReloadable`。不能热启停的插件应声明 `requiresRestart: true`，详细能力字段见开发规范。
+
+参数更新能力独立于插件热启停：不能热启停但可以原地调参的插件，实现 `ISettingsReloadable` 并声明 `canReloadSettings: true` 即可。只在启动时使用的字段可在对应 `settings` 项中加上 `requiresRestart: true`；框架保存新值，向运行实例保留该字段旧值，其余参数照常应用，并显示「待重启」。未实现即时应用并不阻止保存；真正的应用异常仍须抛出并显示「失败」。
+
+继承 `SchemaSettingsUi` 时，框架在详情工具栏提供统一的「保存配置」按钮，调用 `SaveSettings()` 保存普通参数和资源分区，插件无需重复绘制保存或重新读取按钮。完全自定义的 `IPluginSettingsUi` 仍通过 `ISettingsUiContext.SaveSettings()` 管理自己的保存交互。
 
 ## 3. 安装 SDK 依赖并构建
 
@@ -219,7 +223,7 @@ Write-Output $zipPath
 
 | 现象 | 检查方向 |
 | --- | --- |
-| 找不到 `Gkms.Sdk` 包 | 本地源是否直接包含 `.nupkg`，版本是否为 `2.0.6`；不要假定它已在公共 NuGet 发布 |
+| 找不到 `Gkms.Sdk` 包 | 本地源是否直接包含 `.nupkg`，版本是否为 `2.0.7`；不要假定它已在公共 NuGet 发布 |
 | 找不到插件入口 | DLL 文件名、完整命名空间、公开类型和无参构造函数是否与清单一致 |
 | 已安装但没有问候 | 新安装默认停用；运行验证需已启动游戏并启用插件，查看 `runtime.log` |
 | 参数页没有控件 | `settings` 是否存在且有效；本例不需要声明 `settingsUi` |

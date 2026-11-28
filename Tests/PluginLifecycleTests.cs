@@ -18,8 +18,8 @@ internal static class PluginLifecycleTests
         const string id = "example.greeting";
         var logs = new List<string>();
         void Manifest(Manifest manifest) => File.WriteAllText(manifestFile, JsonSerializer.Serialize(manifest, Catalog.Json));
-        void Profile(bool enabled, string message = "initial") => File.WriteAllText(profileFile,
-            JsonSerializer.Serialize(new { enabled = enabled ? new[] { id } : Array.Empty<string>(), settings = new Dictionary<string, object> { [id] = new { message } } }));
+        void Profile(bool enabled, string message = "initial", bool startup = false) => File.WriteAllText(profileFile,
+            JsonSerializer.Serialize(new { enabled = enabled ? new[] { id } : Array.Empty<string>(), settings = new Dictionary<string, object> { [id] = new { message, startup } } }));
 
         // Install a startup-only package after the host has already started.
         Profile(false);
@@ -57,6 +57,30 @@ internal static class PluginLifecycleTests
             Check(host.GetStates()[id].State == PluginRunState.Running, "重试成功清除旧失败状态");
             Profile(false); host.ReloadProfile();
             Check(host.GetStates()[id].State == PluginRunState.RestartRequired, "独立参数接口不能绕过热停用限制");
+        }
+
+        Manifest(original with { RequiresRestart = true, CanReloadSettings = true,
+            Settings = original.Settings.Concat(new[] { new Gkms.Sdk.PluginSetting("startup", "启动选项", "boolean", JsonSerializer.SerializeToElement(false)) { RequiresRestart = true } }).ToArray() });
+        Profile(true);
+        using (var host = new PluginHost(new NoGame(), logs.Add))
+        {
+            host.Start(packages, profileFile, root);
+            Profile(true, "mixed", true); host.ReloadProfile();
+            Check(logs.Any(s => s.Contains("参数已重载: mixed;startup=False")) && host.GetStates()[id].State == PluginRunState.RestartRequired,
+                "同次保存即时应用普通参数，启动参数保持原值并待重启");
+            Check(Catalog.ReadProfile(profileFile, Catalog.Discover(packages, _ => { })).Settings![id].GetProperty("startup").GetBoolean(), "延后应用不能回写覆盖已保存参数");
+            var count = logs.Count(s => s.Contains("参数已重载:")); host.ReloadProfile();
+            Check(count == logs.Count(s => s.Contains("参数已重载:")) && host.GetStates()[id].State == PluginRunState.RestartRequired, "重复读取不重复热应用，保留待重启");
+            Profile(true, "mixed", false); host.ReloadProfile();
+            Check(host.GetStates()[id].State == PluginRunState.Running, "撤销延后参数清除待重启");
+            Profile(true, "next", true); host.ReloadProfile();
+        }
+        using (var host = new PluginHost(new NoGame(), logs.Add))
+        {
+            host.Start(packages, profileFile, root);
+            Check(host.GetStates()[id].State == PluginRunState.Running, "新会话使用保存参数并清除待重启");
+            Profile(true, "after-start", true); host.ReloadProfile();
+            Check(logs.Any(s => s.Contains("参数已重载: after-start;startup=True")), "新会话确实采用上次延后值");
         }
 
         Manifest(original); Profile(false);

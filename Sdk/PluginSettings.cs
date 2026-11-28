@@ -13,6 +13,8 @@ public sealed record PluginSetting(string Key, string Label, string Type, JsonEl
     public Dictionary<string, string>? Labels { get; init; }
     public bool Advanced { get; init; }
     public string? Section { get; init; }
+    // Persist immediately, but retain the running value until the next plugin start.
+    public bool RequiresRestart { get; init; }
     public string DisplayLabel(string language) => Labels?.GetValueOrDefault(language) ?? Label;
 }
 

@@ -10,8 +10,7 @@ public class SchemaSettingsUi : IPluginSettingsUi
 {
     protected ISettingsUiContext Context { get; private set; } = null!;
     private JsonObject values = new();
-    private string message = "", resourceMessage = "";
-    private bool open, reloading;
+    private bool open;
     private int preset = -1;
     public virtual void Initialize(ISettingsUiContext context)
     {
@@ -25,20 +24,26 @@ public class SchemaSettingsUi : IPluginSettingsUi
     {
         "en" => en,
         "zh-TW" => cn switch { "预设" => "預設", "保存配置" => "儲存設定",
-            "重新读取" => "重新讀取", "重载资源" => "重新載入資源", "配置已保存。" => "設定已儲存。", "此插件无需参数。" => "此插件無需參數。", _ => cn },
+            _ => cn },
         "ja" => cn switch { "预设" => "プリセット", "保存配置" => "設定を保存",
-            "重新读取" => "設定を再読込", "重载资源" => "リソース再読込", "配置已保存。" => "設定を保存しました。", "此插件无需参数。" => "設定項目はありません。", _ => cn },
+            _ => cn },
         _ => cn
     };
     public virtual void Draw()
     {
-        DrawSection(Context.Fields.Where(f => f.Section != "resources").ToArray(), ref message, false);
+        DrawSection(Context.Fields.Where(f => f.Section != "resources").ToArray());
     }
     public virtual void DrawResourceSettings()
     {
-        DrawSection(Context.Fields.Where(f => f.Section == "resources").ToArray(), ref resourceMessage, true);
+        DrawSection(Context.Fields.Where(f => f.Section == "resources").ToArray());
     }
-    private void DrawSection(IReadOnlyList<PluginSetting> fields, ref string sectionMessage, bool resources)
+    /// <summary>Save the edited settings from all sections through the manager's shared action.</summary>
+    public void SaveSettings()
+    {
+        var keys = Context.Fields.Select(field => field.Key).ToHashSet();
+        Context.SaveSettings(JsonSerializer.SerializeToElement(values.Where(pair => keys.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value)));
+    }
+    private void DrawSection(IReadOnlyList<PluginSetting> fields)
     {
         if (!open || fields.Count == 0) return;
         var keys = fields.Select(f => f.Key).ToHashSet();
@@ -58,45 +63,10 @@ public class SchemaSettingsUi : IPluginSettingsUi
                 try
                 {
                     foreach (var pair in presets[preset].Values.EnumerateObject()) values[pair.Name] = JsonNode.Parse(pair.Value.GetRawText());
-                    sectionMessage = "";
                 }
-                catch (Exception error) { sectionMessage = error.Message; }
+                catch (Exception error) { PluginUiText.Wrapped(error.GetBaseException().Message); }
             }
         }
-        ImGui.Spacing();
-        if (!resources) { ImGui.Separator(); ImGui.Spacing(); }
-        if (ImGui.Button(L("保存配置", "Save settings")))
-        {
-            try
-            {
-                Context.SaveSettings(JsonSerializer.SerializeToElement(values.Where(p => keys.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value)));
-                sectionMessage = L("配置已保存。", "Settings saved.");
-            }
-            catch (Exception error) { sectionMessage = error.GetBaseException().Message; }
-        }
-        ImGui.SameLine();
-        if (ImGui.Button(L("重新读取", "Reload settings")))
-        {
-            try
-            {
-                Context.ReloadSettings();
-                foreach (var key in keys)
-                {
-                    if (Context.Settings.ValueKind == JsonValueKind.Object && Context.Settings.TryGetProperty(key, out var saved))
-                        values[key] = JsonNode.Parse(saved.GetRawText());
-                    else values.Remove(key);
-                }
-                sectionMessage = "";
-            }
-            catch (Exception error) { sectionMessage = error.GetBaseException().Message; }
-        }
-        if (Context.CanReloadResources && !resources && !Context.Fields.Any(f => f.Section == "resources"))
-        {
-            ImGui.SameLine(); ImGui.BeginDisabled(reloading);
-            if (ImGui.Button(L("重载资源", "Reload resources"))) { reloading = true; _ = Reload(resources); }
-            ImGui.EndDisabled();
-        }
-        if (sectionMessage.Length > 0) { ImGui.Spacing(); PluginUiText.Wrapped(sectionMessage); }
     }
     private void DrawField(PluginSetting field)
     {
@@ -123,6 +93,12 @@ public class SchemaSettingsUi : IPluginSettingsUi
                 break;
             case "string":
                 var text = node.GetValue<string>();
+                if (field.Section == "resources")
+                {
+                    PluginUiText.Wrapped(label);
+                    ImGui.SetNextItemWidth(-1);
+                    label = "##value";
+                }
                 if (ImGui.InputText(label, ref text, (uint)Math.Max(4096, System.Text.Encoding.UTF8.GetByteCount(text) + 1024))) values[field.Key] = text;
                 break;
             default:
@@ -149,17 +125,6 @@ public class SchemaSettingsUi : IPluginSettingsUi
                 }
                 break;
         }
-    }
-    private async Task Reload(bool resources)
-    {
-        try
-        {
-            string result;
-            try { result = await Context.ReloadResourcesAsync().ConfigureAwait(false); }
-            catch (Exception error) { result = error.GetBaseException().Message; }
-            Context.UiBuilder.Enqueue(() => { if (resources) resourceMessage = result; else message = result; reloading = false; });
-        }
-        catch (ObjectDisposedException) { }
     }
     public virtual void Dispose()
     {

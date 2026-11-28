@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>2.0.6</Version>
+    <Version>2.0.7</Version>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
     <Description>Gakumas Localify plugin interfaces and declarative configuration, API 2.</Description>

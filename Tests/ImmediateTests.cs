@@ -129,6 +129,16 @@ internal static class ImmediateTests
                 Check(retired.AccessAfterDestroy == 0 && raw.text == "文本一" && card.Name == "表名一", "拒绝文本重载，不访问旧对象或替换启动词典");
                 Profile(true, 4, 5); host.ReloadProfile();
                 Check(bone.spring == 4 && quality.Settings.Item1 == 5, "配置重载立即应用当前角色与画质");
+                if (cycle == 0)
+                {
+                    var loadedCountBeforeSettings = log.Count(l => l.EndsWith(": 已加载。"));
+                    var pixelsBeforeSettings = shared.Pixels.ToArray();
+                    File.WriteAllText(profile, """{"enabled":["localization","graphics","physics","textures"],"settings":{"physics":{"spring":4},"graphics":{"quality":5},"textures":{"autoCheckUpdates":true,"updateSource":"new-source.zip"}}}"""); host.ReloadProfile();
+                    Check(host.GetStates()["textures"].State == PluginRunState.RestartRequired && pixelsBeforeSettings.SequenceEqual(shared.Pixels) &&
+                        loadedCountBeforeSettings == log.Count(l => l.EndsWith(": 已加载。")), "更新源参数不重建贴图，启动检查单独待重启");
+                    Profile(true, 4, 5); host.ReloadProfile();
+                    Check(host.GetStates()["textures"].State == PluginRunState.Running, "撤销启动检查设置清除贴图待重启");
+                }
                 File.WriteAllBytes(Path.Combine(textures, "shared.png"), new byte[] { 9 }); host.ReloadResources("textures");
                 Check(shared.Pixels.SequenceEqual(new byte[] { 9 }) && first.Current == materialTexture, "共享纹理即时资源重载");
                 if (cycle == 0)
